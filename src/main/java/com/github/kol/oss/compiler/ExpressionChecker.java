@@ -2,7 +2,7 @@ package com.github.kol.oss.compiler;
 
 import com.github.kol.oss.compiler.exception.LexicalException;
 import com.github.kol.oss.compiler.exception.SyntaxException;
-import com.github.kol.oss.compiler.lexer.LexicalAnalyzer;
+import com.github.kol.oss.compiler.lexica.LexicalAnalyzer;
 import com.github.kol.oss.compiler.syntax.SyntaxAnalyzer;
 import com.github.kol.oss.compiler.token.Token;
 

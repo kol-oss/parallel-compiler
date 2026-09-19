@@ -1,19 +1,19 @@
-package com.github.kol.oss.compiler.lexer;
+package com.github.kol.oss.compiler.mapper;
 
+import com.github.kol.oss.compiler.constant.MathSymbols;
+import com.github.kol.oss.compiler.exception.LexicalException;
+import com.github.kol.oss.compiler.lexica.LexicalState;
 import com.github.kol.oss.compiler.token.TokenType;
 
-import java.util.Set;
-
-public class StateMapper {
-    private static final Set<String> CONSTANTS = Set.of("Pi", "e");
-    private static final Set<String> FUNCTIONS = Set.of("sin", "cos", "tan", "sqrt", "log");
-
-    public static TokenType toTokenType(LexerState state, String value) {
-        if (state == LexerState.INT)
+public class TokenTypeMapper {
+    public static TokenType toTokenType(LexicalState state, String value) {
+        if (state == LexicalState.NUMBER)
             return TokenType.INT;
-        else if (state == LexerState.FRACTION)
+
+        if (state == LexicalState.FRACTION)
             return TokenType.FLOAT;
-        else if (state == LexerState.OPERATOR) {
+
+        if (state == LexicalState.OPERATOR) {
             switch (value) {
                 case "*" -> {
                     return TokenType.MULTIPLY;
@@ -37,15 +37,17 @@ public class StateMapper {
                     return TokenType.RPAREN;
                 }
             }
-        } else if (state == LexerState.WORD) {
-            if (CONSTANTS.contains(value))
+        }
+
+        if (state == LexicalState.STRING) {
+            if (MathSymbols.CONSTANTS.contains(value))
                 return TokenType.CONSTANT;
-            if (FUNCTIONS.contains(value))
+            if (MathSymbols.FUNCTIONS.contains(value))
                 return TokenType.FUNCTION;
 
             return TokenType.VARIABLE;
         }
 
-        throw new UnsupportedOperationException("Can not convert lexer state " + state + " with value " + value + " into token");
+        throw new LexicalException(0, "Can not convert lexer state " + state + " with value " + value + " into token");
     }
 }

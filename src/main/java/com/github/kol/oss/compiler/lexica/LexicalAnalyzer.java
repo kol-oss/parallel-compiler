@@ -1,4 +1,4 @@
-package com.github.kol.oss.compiler.lexer;
+package com.github.kol.oss.compiler.lexica;
 
 import com.github.kol.oss.compiler.constant.LexicalRegex;
 import com.github.kol.oss.compiler.exception.LexicalException;
@@ -10,9 +10,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class LexicalAnalyzer {
-    private LexerState state = LexerState.UNKNOWN;
+    private LexicalState state = LexicalState.UNKNOWN;
     private TokenBuilder tokenBuilder;
-
     private int index;
 
     private final Map<String, Consumer<Character>> processors = Map.of(
@@ -23,50 +22,65 @@ public class LexicalAnalyzer {
             LexicalRegex.STRING, this::processString
     );
 
-    private void formToken() {
-        tokenBuilder.createToken(state);
-        state = LexerState.UNKNOWN;
+    private boolean isDebug = false;
+
+    public boolean toggleDebug() {
+        isDebug = !isDebug;
+        return isDebug;
     }
 
+    private void formToken() {
+        tokenBuilder.createToken(state);
+        state = LexicalState.UNKNOWN;
+    }
+
+    // empty symbols (like space)
     private void processEmpty(char symbol) {
         formToken();
     }
 
+    // integer numbers
     private void processNumber(char symbol) {
-        if (state == LexerState.WORD || state == LexerState.OPERATOR)
+        if (state == LexicalState.STRING)
+            throw new LexicalException(index, "Can not create word literals that contains numbers");
+
+        if (state == LexicalState.OPERATOR)
             formToken();
 
         tokenBuilder.append(symbol);
 
-        if (state == LexerState.UNKNOWN && Character.isDigit(symbol))
-            state = LexerState.INT;
+        if (state == LexicalState.UNKNOWN && Character.isDigit(symbol))
+            state = LexicalState.NUMBER;
     }
 
+    // decimal numbers
     private void processFraction(char symbol) {
-        if (state != LexerState.INT)
+        if (state != LexicalState.NUMBER)
             throw new LexicalException(index, "Fraction symbol (.) can not be placed when already in " + state + " state");
 
         tokenBuilder.append(symbol);
-        state = LexerState.FRACTION;
+        state = LexicalState.FRACTION;
     }
 
+    // operators
     private void processOperator(char symbol) {
         formToken();
 
         tokenBuilder.append(symbol);
-        state = LexerState.OPERATOR;
+        state = LexicalState.OPERATOR;
     }
 
+    // strings
     private void processString(char symbol) {
-        if (state == LexerState.INT || state == LexerState.FRACTION) {
+        if (state == LexicalState.NUMBER || state == LexicalState.FRACTION) {
             throw new LexicalException(index, "Can not create word literals that contains numbers");
         }
 
-        if (state != LexerState.UNKNOWN && state != LexerState.WORD)
+        if (state != LexicalState.UNKNOWN && state != LexicalState.STRING)
             formToken();
 
         tokenBuilder.append(symbol);
-        state = LexerState.WORD;
+        state = LexicalState.STRING;
     }
 
     private boolean processSymbol(char symbol) {
@@ -83,8 +97,9 @@ public class LexicalAnalyzer {
     }
 
     public List<Token> analyze(String expression) {
-        state = LexerState.UNKNOWN;
-        tokenBuilder = new TokenBuilder();
+        tokenBuilder = new TokenBuilder(isDebug);
+
+        state = LexicalState.UNKNOWN;
         index = 0;
 
         for (char symbol : expression.toCharArray()) {

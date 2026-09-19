@@ -1,27 +1,37 @@
 package com.github.kol.oss.compiler.token;
 
-import com.github.kol.oss.compiler.lexer.LexerState;
-import com.github.kol.oss.compiler.lexer.StateMapper;
+import com.github.kol.oss.compiler.lexica.LexicalState;
+import com.github.kol.oss.compiler.mapper.TokenTypeMapper;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class TokenBuilder {
-    private final StringBuilder token = new StringBuilder();
+    private final StringBuilder tokenString = new StringBuilder();
     private final List<Token> tokens = new ArrayList<>();
 
-    public void append(char symbol) {
-        token.append(symbol);
+    private final boolean isDebug;
+
+    public TokenBuilder(boolean isDebug) {
+        this.isDebug = isDebug;
     }
 
-    public void createToken(LexerState state) {
-        if (state == LexerState.UNKNOWN || token.isEmpty())
+    public void append(char symbol) {
+        tokenString.append(symbol);
+    }
+
+    public void createToken(LexicalState state) {
+        if (state == LexicalState.UNKNOWN || tokenString.isEmpty())
             return;
 
-        String value = token.toString();
+        String value = tokenString.toString();
+        Token token = new Token(value, TokenTypeMapper.toTokenType(state, value));
 
-        tokens.add(new Token(value, StateMapper.toTokenType(state, value)));
-        token.setLength(0);
+        tokens.add(token);
+        tokenString.setLength(0);
+
+        if (isDebug)
+            System.out.println("> added token \"" + token.value() + "\" with type " + token.type());
     }
 
     public List<Token> getTokens() {
