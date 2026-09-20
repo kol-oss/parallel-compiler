@@ -29,10 +29,26 @@ public class ExpressionChecker {
             tokens = lexicalAnalyzer.analyze(expression);
             syntaxAnalyzer.analyze(tokens);
         } catch (LexicalException exception) {
-            int position = exception.getPosition();
+            List<Integer> errorIndexes = new ArrayList<>();
+            List<String> errorMessages = new ArrayList<>();
+            for (LexicalException childException : exception.getMessages()) {
+                int position = childException.getPosition();
 
-            System.out.println(expression.substring(0, position) + ANSI_RED + expression.charAt(position) + ANSI_RESET + expression.substring(position + 1));
-            System.out.println(ANSI_RED + "Lexical error at position " + exception.getPosition() + ": " + exception.getMessage() + ANSI_RESET);
+                errorIndexes.add(position);
+                errorMessages.add("> (" + position + "): " + childException.getMessage());
+            }
+
+            StringBuilder errorExpression = new StringBuilder();
+            for (int i = 0; i < expression.length(); i++) {
+                char symbol = expression.charAt(i);
+                if (errorIndexes.contains(i))
+                    errorExpression.append(ANSI_RED).append(symbol).append(ANSI_RESET);
+                else
+                    errorExpression.append(symbol);
+            }
+
+            System.out.println(ANSI_RED + "Lexical validation failed: " + ANSI_RESET + errorExpression);
+            errorMessages.forEach(System.out::println);
             return;
         } catch (SyntaxException exception) {
             System.out.println(tokens.stream().map(token -> token == exception.getToken() ? ANSI_RED + token.value() + ANSI_RESET : token.value()).collect(Collectors.joining(" ")));

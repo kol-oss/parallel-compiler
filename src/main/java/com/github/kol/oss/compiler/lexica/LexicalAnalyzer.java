@@ -5,6 +5,7 @@ import com.github.kol.oss.compiler.exception.LexicalException;
 import com.github.kol.oss.compiler.token.Token;
 import com.github.kol.oss.compiler.token.TokenBuilder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -12,6 +13,8 @@ import java.util.function.Consumer;
 public class LexicalAnalyzer {
     private LexicalState state = LexicalState.UNKNOWN;
     private TokenBuilder tokenBuilder;
+
+    private List<LexicalException> exceptions = new ArrayList<>();
     private int index;
 
     private final Map<String, Consumer<Character>> processors = Map.of(
@@ -41,8 +44,10 @@ public class LexicalAnalyzer {
 
     // integer numbers
     private void processNumber(char symbol) {
-        if (state == LexicalState.STRING)
-            throw new LexicalException(index, "Can not create word literals that contains numbers");
+        if (state == LexicalState.STRING) {
+            processError("Can not create word literals that contains numbers");
+            return;
+        }
 
         if (state == LexicalState.OPERATOR)
             formToken();
@@ -55,8 +60,10 @@ public class LexicalAnalyzer {
 
     // decimal numbers
     private void processFraction(char symbol) {
-        if (state != LexicalState.NUMBER)
-            throw new LexicalException(index, "Fraction symbol (.) can not be placed when already in " + state + " state");
+        if (state != LexicalState.NUMBER) {
+            processError("Fraction symbol (.) can not be placed when already in " + state + " state");
+            return;
+        }
 
         tokenBuilder.append(symbol);
         state = LexicalState.FRACTION;
@@ -73,7 +80,8 @@ public class LexicalAnalyzer {
     // strings
     private void processString(char symbol) {
         if (state == LexicalState.NUMBER || state == LexicalState.FRACTION) {
-            throw new LexicalException(index, "Can not create word literals that contains numbers");
+            processError("Can not create word literals that contains numbers");
+            return;
         }
 
         if (state != LexicalState.UNKNOWN && state != LexicalState.STRING)
@@ -81,6 +89,14 @@ public class LexicalAnalyzer {
 
         tokenBuilder.append(symbol);
         state = LexicalState.STRING;
+    }
+
+    private void processError(String message) {
+        LexicalException exception = new LexicalException(index, message);
+        exceptions.add(exception);
+
+        tokenBuilder.clearToken();
+        state = LexicalState.UNKNOWN;
     }
 
     private boolean processSymbol(char symbol) {
@@ -98,19 +114,28 @@ public class LexicalAnalyzer {
 
     public List<Token> analyze(String expression) {
         tokenBuilder = new TokenBuilder(isDebug);
-
         state = LexicalState.UNKNOWN;
+
         index = 0;
+        exceptions = new ArrayList<>();
 
         for (char symbol : expression.toCharArray()) {
             boolean isProcessed = processSymbol(symbol);
-            if (!isProcessed)
-                throw new LexicalException(index, "Symbol " + symbol + " can not be processed because it's signature is unknown");
+
+            if (!isProcessed) {
+                processError("Symbol " + symbol + " can not be processed because it's signature is unknown");
+                index++;
+                continue;
+            }
 
             index++;
         }
 
         formToken();
+        if (!exceptions.isEmpty()) {
+            throw new LexicalException(exceptions);
+        }
+
         return tokenBuilder.getTokens();
     }
 }

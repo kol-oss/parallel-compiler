@@ -28,10 +28,14 @@ public class TokenBuilder {
         Token token = new Token(value, TokenTypeMapper.toTokenType(state, value));
 
         tokens.add(token);
-        tokenString.setLength(0);
+        clearToken();
 
         if (isDebug)
             System.out.println("> added token \"" + token.value() + "\" with type " + token.type());
+    }
+
+    public void clearToken() {
+        tokenString.setLength(0);
     }
 
     public List<Token> getTokens() {

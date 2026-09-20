@@ -11,11 +11,15 @@ public class SyntaxAnalyzer {
     private TokenType currentType = TokenType.START;
     private int parenthesisCount = 0;
 
-    private void processToken(Token token) {
-        TokenType nextType = token.type();
+    private void checkTransition(Token token, TokenType nextType) {
         if (!SyntaxTransitions.isAllowedTransition(currentType, nextType)) {
             throw new SyntaxException(token, "Not allowed transition from " + currentType + " into " + nextType);
         }
+    }
+
+    private void processToken(Token token) {
+        TokenType nextType = token.type();
+        checkTransition(token, nextType);
 
         if (nextType == TokenType.LPAREN) {
             parenthesisCount++;
@@ -23,7 +27,7 @@ public class SyntaxAnalyzer {
             parenthesisCount--;
 
             if (parenthesisCount < 0) {
-                throw new SyntaxException(null, "Wrongly positioned or unnecessary closing parenthesis");
+                throw new SyntaxException(token, "Wrongly positioned or unnecessary closing parenthesis");
             }
         }
     }
@@ -37,7 +41,10 @@ public class SyntaxAnalyzer {
             currentType = token.type();
         }
 
+        // checking the last token
+        checkTransition(tokens.getLast(), TokenType.END);
+
         if (parenthesisCount > 0)
-            throw new SyntaxException(null, "The number of opening parenthesis is bigger than closing");
+            throw new SyntaxException(tokens.getLast(), "Expected more closing parenthesis (" + parenthesisCount + ")");
     }
 }
