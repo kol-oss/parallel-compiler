@@ -1,14 +1,7 @@
 package com.github.kol.oss.compiler.exception;
 
-import java.util.List;
-
 public class LexicalException extends RuntimeException {
-    private int position = 0;
-    private List<LexicalException> messages;
-
-    public LexicalException(List<LexicalException> messages) {
-        this.messages = messages;
-    }
+    private final int position;
 
     public LexicalException(int position, String message) {
         super(message);
@@ -18,9 +11,5 @@ public class LexicalException extends RuntimeException {
 
     public int getPosition() {
         return position;
-    }
-
-    public List<LexicalException> getMessages() {
-        return messages;
     }
 }

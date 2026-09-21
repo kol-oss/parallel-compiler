@@ -1,6 +1,6 @@
 package com.github.kol.oss.compiler.lexica;
 
-import com.github.kol.oss.compiler.exception.LexicalException;
+import com.github.kol.oss.compiler.exception.GroupedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -48,6 +48,6 @@ public class LexicalAnalyzerTest {
     })
     public void givenInvalidLexica_whenTokenizing_thenThrowsLexical(String expression) {
         LexicalAnalyzer analyzer = new LexicalAnalyzer();
-        assertThrows(LexicalException.class, () -> analyzer.analyze(expression));
+        assertThrows(GroupedException.class, () -> analyzer.analyze(expression));
     }
 }

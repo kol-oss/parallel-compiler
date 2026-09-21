@@ -1,5 +1,6 @@
 package com.github.kol.oss.compiler;
 
+import com.github.kol.oss.compiler.exception.GroupedException;
 import com.github.kol.oss.compiler.exception.LexicalException;
 import com.github.kol.oss.compiler.exception.SyntaxException;
 import com.github.kol.oss.compiler.lexica.LexicalAnalyzer;
@@ -23,39 +24,60 @@ public class ExpressionChecker {
         this.syntaxAnalyzer = syntaxAnalyzer;
     }
 
+    private void visualizeLexicalError(String expression, List<LexicalException> exceptions) {
+        List<Integer> errorIndexes = new ArrayList<>();
+        List<String> errorMessages = new ArrayList<>();
+        for (LexicalException childException : exceptions) {
+            int position = childException.getPosition();
+
+            errorIndexes.add(position);
+            errorMessages.add(ANSI_RED + "> (index: " + position + "): " + childException.getMessage() + ANSI_RESET);
+        }
+
+        StringBuilder errorExpression = new StringBuilder();
+        for (int i = 0; i < expression.length(); i++) {
+            char symbol = expression.charAt(i);
+            if (errorIndexes.contains(i))
+                errorExpression.append(ANSI_RED).append(symbol).append(ANSI_RESET);
+            else
+                errorExpression.append(symbol);
+        }
+
+        System.out.println(ANSI_RED + "Lexical validation failed: " + ANSI_RESET + errorExpression);
+        errorMessages.forEach(System.out::println);
+    }
+
+    private void visualizeSyntaxError(List<Token> tokens, List<SyntaxException> exceptions) {
+        List<Token> errorTokens = new ArrayList<>();
+        for (SyntaxException exception : exceptions) {
+            errorTokens.add(exception.getToken());
+        }
+
+        String errorExpression = tokens.stream()
+                .map(token -> errorTokens.contains(token) ? ANSI_RED + token.value() + ANSI_RESET : token.value())
+                .collect(Collectors.joining(" "));
+        System.out.println(ANSI_RED + "Syntax validation failed: " + ANSI_RESET + errorExpression);
+
+        for (SyntaxException exception : exceptions) {
+            System.out.println(ANSI_RED + "> '" + exception.getToken().value() + "': " + exception.getMessage() + ANSI_RESET);
+        }
+    }
+
     public void validateAndVisualize(String expression) {
         List<Token> tokens = new ArrayList<>();
         try {
             tokens = lexicalAnalyzer.analyze(expression);
             syntaxAnalyzer.analyze(tokens);
-        } catch (LexicalException exception) {
-            List<Integer> errorIndexes = new ArrayList<>();
-            List<String> errorMessages = new ArrayList<>();
-            for (LexicalException childException : exception.getMessages()) {
-                int position = childException.getPosition();
 
-                errorIndexes.add(position);
-                errorMessages.add("> (" + position + "): " + childException.getMessage());
-            }
+            System.out.println(ANSI_GREEN + "expression is valid" + ANSI_RESET);
+        } catch (GroupedException exception) {
+            List<LexicalException> lexicalExceptions = exception.getChildren(LexicalException.class);
+            if (!lexicalExceptions.isEmpty())
+                visualizeLexicalError(expression, lexicalExceptions);
 
-            StringBuilder errorExpression = new StringBuilder();
-            for (int i = 0; i < expression.length(); i++) {
-                char symbol = expression.charAt(i);
-                if (errorIndexes.contains(i))
-                    errorExpression.append(ANSI_RED).append(symbol).append(ANSI_RESET);
-                else
-                    errorExpression.append(symbol);
-            }
-
-            System.out.println(ANSI_RED + "Lexical validation failed: " + ANSI_RESET + errorExpression);
-            errorMessages.forEach(System.out::println);
-            return;
-        } catch (SyntaxException exception) {
-            System.out.println(tokens.stream().map(token -> token == exception.getToken() ? ANSI_RED + token.value() + ANSI_RESET : token.value()).collect(Collectors.joining(" ")));
-            System.out.println(ANSI_RED + "Syntax error at token " + exception.getToken().value() + ": " + exception.getMessage() + ANSI_RESET);
-            return;
+            List<SyntaxException> syntaxExceptions = exception.getChildren(SyntaxException.class);
+            if (!syntaxExceptions.isEmpty())
+                visualizeSyntaxError(tokens, syntaxExceptions);
         }
-
-        System.out.println(ANSI_GREEN + "expression is valid" + ANSI_RESET);
     }
 }

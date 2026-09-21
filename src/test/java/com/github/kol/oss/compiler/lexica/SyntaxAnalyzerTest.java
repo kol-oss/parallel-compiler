@@ -1,6 +1,6 @@
 package com.github.kol.oss.compiler.lexica;
 
-import com.github.kol.oss.compiler.exception.SyntaxException;
+import com.github.kol.oss.compiler.exception.GroupedException;
 import com.github.kol.oss.compiler.syntax.SyntaxAnalyzer;
 import com.github.kol.oss.compiler.token.Token;
 import org.junit.jupiter.api.DisplayName;
@@ -56,6 +56,6 @@ public class SyntaxAnalyzerTest {
         List<Token> tokens = lexicalAnalyzer.analyze(expression);
 
         SyntaxAnalyzer analyzer = new SyntaxAnalyzer();
-        assertThrows(SyntaxException.class, () -> analyzer.analyze(tokens));
+        assertThrows(GroupedException.class, () -> analyzer.analyze(tokens));
     }
 }

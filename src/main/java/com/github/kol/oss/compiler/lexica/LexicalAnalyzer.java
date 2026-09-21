@@ -1,6 +1,7 @@
 package com.github.kol.oss.compiler.lexica;
 
 import com.github.kol.oss.compiler.constant.LexicalRegex;
+import com.github.kol.oss.compiler.exception.GroupedException;
 import com.github.kol.oss.compiler.exception.LexicalException;
 import com.github.kol.oss.compiler.token.Token;
 import com.github.kol.oss.compiler.token.TokenBuilder;
@@ -37,7 +38,7 @@ public class LexicalAnalyzer {
         state = LexicalState.UNKNOWN;
     }
 
-    // empty symbols (like space)
+    // empty symbols
     private void processEmpty(char symbol) {
         formToken();
     }
@@ -61,7 +62,7 @@ public class LexicalAnalyzer {
     // decimal numbers
     private void processFraction(char symbol) {
         if (state != LexicalState.NUMBER) {
-            processError("Fraction symbol (.) can not be placed when already in " + state + " state");
+            processError("Fraction symbol (.) can not be placed when analyzer in " + state + " state");
             return;
         }
 
@@ -91,6 +92,7 @@ public class LexicalAnalyzer {
         state = LexicalState.STRING;
     }
 
+    // exception
     private void processError(String message) {
         LexicalException exception = new LexicalException(index, message);
         exceptions.add(exception);
@@ -121,19 +123,15 @@ public class LexicalAnalyzer {
 
         for (char symbol : expression.toCharArray()) {
             boolean isProcessed = processSymbol(symbol);
-
-            if (!isProcessed) {
+            if (!isProcessed)
                 processError("Symbol " + symbol + " can not be processed because it's signature is unknown");
-                index++;
-                continue;
-            }
 
             index++;
         }
 
         formToken();
         if (!exceptions.isEmpty()) {
-            throw new LexicalException(exceptions);
+            throw new GroupedException(exceptions);
         }
 
         return tokenBuilder.getTokens();
