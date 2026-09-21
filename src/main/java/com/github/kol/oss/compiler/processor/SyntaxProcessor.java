@@ -38,6 +38,13 @@ public class SyntaxProcessor {
             if (lastType == TokenType.FUNCTION)
                 functionParenthesisCount.add(parenthesisCount);
         } else if (nextType == TokenType.RPAREN) {
+            if (lastType == TokenType.LPAREN && !functionParenthesisCount.contains(parenthesisCount)) {
+                InvalidContentException exception = new InvalidContentException();
+                exception.setIndex(token.position());
+
+                exceptionHandler.add(exception);
+            }
+
             functionParenthesisCount.remove(parenthesisCount);
             parenthesisCount--;
 

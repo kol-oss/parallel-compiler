@@ -67,9 +67,11 @@ public class TokenTransitions {
                     TokenType.FLOAT,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
-                    TokenType.LPAREN
+                    TokenType.LPAREN,
+                    TokenType.RPAREN
             )),
             Map.entry(TokenType.RPAREN, Set.of(
+                    TokenType.OPERATOR,
                     TokenType.COMMA,
                     TokenType.RPAREN,
                     TokenType.END
