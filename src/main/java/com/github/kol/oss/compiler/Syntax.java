@@ -1,8 +1,8 @@
-package com.github.kol.oss.compiler.reworked;
+package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.reworked.exception.*;
-import com.github.kol.oss.compiler.reworked.token.Token;
-import com.github.kol.oss.compiler.reworked.token.TokenType;
+import com.github.kol.oss.compiler.exception.*;
+import com.github.kol.oss.compiler.token.Token;
+import com.github.kol.oss.compiler.token.TokenType;
 
 import java.util.HashSet;
 import java.util.List;

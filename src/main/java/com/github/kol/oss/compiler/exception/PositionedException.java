@@ -1,4 +1,4 @@
-package com.github.kol.oss.compiler.reworked.exception;
+package com.github.kol.oss.compiler.exception;
 
 public class PositionedException extends RuntimeException {
     private int index;

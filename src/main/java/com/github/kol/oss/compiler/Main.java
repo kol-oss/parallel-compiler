@@ -1,32 +1,22 @@
 package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.lexica.LexicalAnalyzer;
-import com.github.kol.oss.compiler.syntax.SyntaxAnalyzer;
+import com.github.kol.oss.compiler.exception.ExceptionHandler;
+import com.github.kol.oss.compiler.token.Token;
 
-import java.util.Scanner;
+import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        LexicalAnalyzer lexicalAnalyzer = new LexicalAnalyzer();
-        SyntaxAnalyzer syntaxAnalyzer = new SyntaxAnalyzer();
+        String expression = "7.111.01";
 
-        ExpressionChecker expressionChecker = new ExpressionChecker(lexicalAnalyzer, syntaxAnalyzer);
+        ExceptionHandler exceptionHandler = new ExceptionHandler();
 
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            System.out.print("Enter expression or command: ");
+        Lexer lexer = new Lexer(exceptionHandler);
+        List<Token> tokens = lexer.process(expression);
 
-            String expression = scanner.nextLine();
-            if (expression.equalsIgnoreCase("end"))
-                return;
+        Syntax syntax = new Syntax(exceptionHandler);
+        syntax.process(tokens);
 
-            if (expression.equalsIgnoreCase("debug")) {
-                boolean isDebug = lexicalAnalyzer.toggleDebug();
-                System.out.println("debug " + (isDebug ? "enabled" : "disabled"));
-                continue;
-            }
-
-            expressionChecker.validateAndVisualize(expression);
-        }
+        exceptionHandler.printAndClear(expression);
     }
 }

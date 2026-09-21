@@ -1,6 +1,6 @@
-package com.github.kol.oss.compiler.reworked.exception;
+package com.github.kol.oss.compiler.exception;
 
-import com.github.kol.oss.compiler.reworked.token.TokenType;
+import com.github.kol.oss.compiler.token.TokenType;
 
 public class InvalidTransitionException extends PositionedException {
     protected final TokenType base;

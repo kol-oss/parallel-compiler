@@ -1,15 +1,12 @@
 package com.github.kol.oss.compiler.token;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 public record Token(
-        long id,
         String value,
-        TokenType type
+        TokenType type,
+        int position
 ) {
-    private static final AtomicLong NEXT_ID = new AtomicLong();
-
-    public Token(String value, TokenType type) {
-        this(NEXT_ID.getAndIncrement(), value, type);
+    @Override
+    public String toString() {
+        return type + "(" + value + ")";
     }
 }

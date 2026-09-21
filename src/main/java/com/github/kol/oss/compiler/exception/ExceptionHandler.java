@@ -1,4 +1,4 @@
-package com.github.kol.oss.compiler.reworked.exception;
+package com.github.kol.oss.compiler.exception;
 
 import java.util.ArrayList;
 import java.util.List;
