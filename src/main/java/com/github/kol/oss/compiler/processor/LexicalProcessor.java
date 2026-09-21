@@ -1,9 +1,10 @@
 package com.github.kol.oss.compiler.processor;
 
+import com.github.kol.oss.compiler.constant.TokenLexica;
+import com.github.kol.oss.compiler.constant.TokenType;
+import com.github.kol.oss.compiler.dto.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
-import com.github.kol.oss.compiler.dto.Token;
-import com.github.kol.oss.compiler.constant.TokenType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +36,7 @@ public class LexicalProcessor {
             return false;
         }
 
-        return lastType != tokenType || tokenType == TokenType.OPERATOR;
+        return lastType != tokenType || TokenLexica.UNARY_TOKENS.contains(tokenType);
     }
 
     private void createToken() {
@@ -63,7 +64,6 @@ public class LexicalProcessor {
         exceptionHandler.add(exception);
 
         createToken();
-
         lastIndex = index;
 
         buffer.setLength(0);

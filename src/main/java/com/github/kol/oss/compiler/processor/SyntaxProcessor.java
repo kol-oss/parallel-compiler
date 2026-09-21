@@ -30,18 +30,8 @@ public class SyntaxProcessor {
         }
     }
 
-    private void processToken(Token token) {
-        String value = token.value();
+    private void checkStructure(Token token) {
         TokenType nextType = token.type();
-
-        if (lastType == TokenType.START && nextType == TokenType.OPERATOR) {
-            if (!value.matches(SymbolRegex.START_OPERATOR)) {
-                InvalidValueException exception = new InvalidValueException(lastType, nextType, value);
-                exception.setIndex(token.position());
-
-                exceptionHandler.add(exception);
-            }
-        }
         if (nextType == TokenType.LPAREN) {
             parenthesisCount++;
 
@@ -65,17 +55,50 @@ public class SyntaxProcessor {
                 exceptionHandler.add(exception);
             }
         }
+    }
 
+    private void processToken(Token token) {
+        String value = token.value();
+        TokenType nextType = token.type();
+
+        if (lastType == TokenType.START && nextType == TokenType.OPERATOR) {
+            if (!value.matches(SymbolRegex.START_OPERATOR)) {
+                InvalidValueException exception = new InvalidValueException(lastType, nextType, value);
+                exception.setIndex(token.position());
+
+                exceptionHandler.add(exception);
+            }
+        }
+
+        checkStructure(token);
         checkTransition(token);
     }
 
+    private void clean() {
+        parenthesisCount = 0;
+        functionParenthesisCount.clear();
+
+        lastType = TokenType.START;
+    }
+
     public void process(List<Token> tokens) {
+        if (tokens.isEmpty())
+            return;
+
+        clean();
         for (Token token : tokens) {
             processToken(token);
             lastType = token.type();
         }
 
         Token lastToken = tokens.getLast();
+        if (parenthesisCount > 0) {
+            InvalidParenthesisException exception = new InvalidParenthesisException(parenthesisCount);
+            exception.setIndex(lastToken.position());
+
+            exceptionHandler.add(exception);
+        }
+
         checkTransition(new Token(lastToken.value(), TokenType.END, lastToken.position()));
     }
 }

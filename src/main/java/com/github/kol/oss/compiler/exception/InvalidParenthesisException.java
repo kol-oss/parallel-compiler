@@ -9,6 +9,6 @@ public class InvalidParenthesisException extends PositionedException {
 
     @Override
     public String getMessage() {
-        return count > 0 ? "More" : "Less" + " closing parenthesis required (" + count + ")";
+        return (count > 0 ? "More" : "Less") + " closing parenthesis required (" + count + ")";
     }
 }
