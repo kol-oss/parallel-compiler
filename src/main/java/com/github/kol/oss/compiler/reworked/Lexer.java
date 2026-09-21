@@ -1,7 +1,7 @@
 package com.github.kol.oss.compiler.reworked;
 
 import com.github.kol.oss.compiler.reworked.exception.ExceptionHandler;
-import com.github.kol.oss.compiler.reworked.exception.UnknownSymbolException;
+import com.github.kol.oss.compiler.reworked.exception.PositionedException;
 import com.github.kol.oss.compiler.reworked.token.Token;
 import com.github.kol.oss.compiler.reworked.token.TokenType;
 
@@ -30,6 +30,11 @@ public class Lexer {
             return true;
         }
 
+        if (lastType == TokenType.INTEGER && tokenType == TokenType.FLOAT) {
+            lastType = TokenType.FLOAT;
+            return false;
+        }
+
         return lastType != tokenType || tokenType == TokenType.OPERATOR;
     }
 
@@ -52,9 +57,11 @@ public class Lexer {
         lastIndex = 0;
     }
 
-    private void processError(UnknownSymbolException exception, int index) {
+    private void processError(PositionedException exception, int index) {
         exception.setIndex(index);
         exceptionHandler.add(exception);
+
+        createToken();
 
         lastIndex = index;
 
@@ -66,7 +73,7 @@ public class Lexer {
         TokenType tokenType;
         try {
             tokenType = TokenType.fromChar(lastType, symbol);
-        } catch (UnknownSymbolException exception) {
+        } catch (PositionedException exception) {
             processError(exception, index);
             return;
         }

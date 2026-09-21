@@ -1,18 +1,21 @@
 package com.github.kol.oss.compiler.reworked.token;
 
+import com.github.kol.oss.compiler.reworked.exception.InvalidSymbolException;
 import com.github.kol.oss.compiler.reworked.exception.UnknownSymbolException;
 
 public enum TokenType {
     INTEGER,
     FLOAT,
+    VARIABLE,
+    FUNCTION,
     OPERATOR,
     LOGICAL_OPERATOR,
     LPAREN,
     RPAREN,
     COMMA,
-    VARIABLE,
-    FUNCTION,
-    SKIP;
+    SKIP,
+    START,
+    END;
 
     public static TokenType fromChar(TokenType state, char character) {
         String symbol = String.valueOf(character);
@@ -30,8 +33,12 @@ public enum TokenType {
         }
 
         // dots - FLOAT
-        if (symbol.matches("[.]"))
+        if (symbol.matches("[.]")) {
+            if (state == FLOAT)
+                throw new InvalidSymbolException(character);
+
             return FLOAT;
+        }
 
         // operation symbols - OPERATOR
         if (symbol.matches("[+\\-/*^%]"))
