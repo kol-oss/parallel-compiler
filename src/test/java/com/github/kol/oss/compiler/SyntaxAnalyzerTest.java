@@ -50,7 +50,9 @@ public class SyntaxAnalyzerTest {
             "((1)",
             "(1))",
             "(1 + (2)",
-            "sinx(1)"
+            "sinx(1)",
+            "/2",
+            "*1.9"
     })
     public void givenInvalidSyntax_whenAnalyzing_thenThrowsSyntax(String expression) {
         LexicalAnalyzer lexicalAnalyzer = new LexicalAnalyzer();
