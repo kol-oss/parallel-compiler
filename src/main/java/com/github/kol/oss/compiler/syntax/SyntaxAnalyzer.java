@@ -39,11 +39,15 @@ public class SyntaxAnalyzer {
         checkTransition(token, nextType);
     }
 
-    public void analyze(List<Token> tokens) {
+    private void clear() {
         currentType = TokenType.START;
         parenthesisCount = 0;
 
         exceptions = new ArrayList<>();
+    }
+
+    public void analyze(List<Token> tokens) {
+        clear();
 
         for (Token token : tokens) {
             processToken(token);

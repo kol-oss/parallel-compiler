@@ -114,12 +114,16 @@ public class LexicalAnalyzer {
         return false;
     }
 
-    public List<Token> analyze(String expression) {
+    private void clear() {
         tokenBuilder = new TokenBuilder(isDebug);
         state = LexicalState.UNKNOWN;
 
         index = 0;
         exceptions = new ArrayList<>();
+    }
+
+    public List<Token> analyze(String expression) {
+        clear();
 
         for (char symbol : expression.toCharArray()) {
             boolean isProcessed = processSymbol(symbol);

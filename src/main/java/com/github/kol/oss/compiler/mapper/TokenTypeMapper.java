@@ -48,9 +48,6 @@ public class TokenTypeMapper {
             return TokenType.VARIABLE;
         }
 
-        System.out.println(state);
-
-        System.out.println(value);
         throw new LexicalException(0, "Can not convert lexer state " + state + " with value " + value + " into token");
     }
 }
