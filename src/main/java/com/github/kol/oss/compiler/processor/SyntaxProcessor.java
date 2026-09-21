@@ -1,26 +1,28 @@
-package com.github.kol.oss.compiler;
+package com.github.kol.oss.compiler.processor;
 
+import com.github.kol.oss.compiler.constant.SymbolRegex;
+import com.github.kol.oss.compiler.constant.TokenTransitions;
+import com.github.kol.oss.compiler.constant.TokenType;
+import com.github.kol.oss.compiler.dto.Token;
 import com.github.kol.oss.compiler.exception.*;
-import com.github.kol.oss.compiler.token.Token;
-import com.github.kol.oss.compiler.token.TokenType;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class Syntax {
+public class SyntaxProcessor {
     private final ExceptionHandler exceptionHandler;
     private final Set<Integer> functionParenthesisCount = new HashSet<>();
     private TokenType lastType = TokenType.START;
     private int parenthesisCount = 0;
 
-    public Syntax(ExceptionHandler exceptionHandler) {
+    public SyntaxProcessor(ExceptionHandler exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
     }
 
     private void checkTransition(Token token) {
         TokenType tokenType = token.type();
-        if (!SyntaxTransitions.isAllowedTransition(lastType, tokenType)) {
+        if (!TokenTransitions.isAllowedTransition(lastType, tokenType)) {
             InvalidTransitionException exception = new InvalidTransitionException(lastType, tokenType);
             exception.setIndex(token.position());
 
@@ -33,7 +35,7 @@ public class Syntax {
         TokenType nextType = token.type();
 
         if (lastType == TokenType.START && nextType == TokenType.OPERATOR) {
-            if (!value.matches("[-]")) {
+            if (!value.matches(SymbolRegex.START_OPERATOR)) {
                 InvalidValueException exception = new InvalidValueException(lastType, nextType, value);
                 exception.setIndex(token.position());
 

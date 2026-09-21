@@ -1,11 +1,9 @@
-package com.github.kol.oss.compiler;
-
-import com.github.kol.oss.compiler.token.TokenType;
+package com.github.kol.oss.compiler.constant;
 
 import java.util.Map;
 import java.util.Set;
 
-public class SyntaxTransitions {
+public class TokenTransitions {
     public static final Map<TokenType, Set<TokenType>> TRANSITIONS = Map.ofEntries(
             Map.entry(TokenType.START, Set.of(
                     TokenType.INTEGER,

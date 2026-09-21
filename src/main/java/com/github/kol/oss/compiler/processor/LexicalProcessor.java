@@ -1,14 +1,14 @@
-package com.github.kol.oss.compiler;
+package com.github.kol.oss.compiler.processor;
 
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
-import com.github.kol.oss.compiler.token.Token;
-import com.github.kol.oss.compiler.token.TokenType;
+import com.github.kol.oss.compiler.dto.Token;
+import com.github.kol.oss.compiler.constant.TokenType;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class Lexer {
+public class LexicalProcessor {
     private final ExceptionHandler exceptionHandler;
 
     private StringBuilder buffer = new StringBuilder();
@@ -17,7 +17,7 @@ public class Lexer {
     private TokenType lastType = TokenType.SKIP;
     private int lastIndex = 0;
 
-    public Lexer(ExceptionHandler exceptionHandler) {
+    public LexicalProcessor(ExceptionHandler exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
     }
 

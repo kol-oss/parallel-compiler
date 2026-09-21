@@ -1,7 +1,9 @@
 package com.github.kol.oss.compiler;
 
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
-import com.github.kol.oss.compiler.token.Token;
+import com.github.kol.oss.compiler.processor.LexicalProcessor;
+import com.github.kol.oss.compiler.processor.SyntaxProcessor;
+import com.github.kol.oss.compiler.dto.Token;
 
 import java.util.List;
 
@@ -11,11 +13,11 @@ public class Main {
 
         ExceptionHandler exceptionHandler = new ExceptionHandler();
 
-        Lexer lexer = new Lexer(exceptionHandler);
-        List<Token> tokens = lexer.process(expression);
+        LexicalProcessor lexicalProcessor = new LexicalProcessor(exceptionHandler);
+        List<Token> tokens = lexicalProcessor.process(expression);
 
-        Syntax syntax = new Syntax(exceptionHandler);
-        syntax.process(tokens);
+        SyntaxProcessor syntaxProcessor = new SyntaxProcessor(exceptionHandler);
+        syntaxProcessor.process(tokens);
 
         exceptionHandler.printAndClear(expression);
     }

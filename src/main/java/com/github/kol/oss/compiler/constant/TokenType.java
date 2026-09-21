@@ -1,4 +1,4 @@
-package com.github.kol.oss.compiler.token;
+package com.github.kol.oss.compiler.constant;
 
 import com.github.kol.oss.compiler.exception.InvalidSymbolException;
 import com.github.kol.oss.compiler.exception.UnknownSymbolException;
@@ -21,11 +21,11 @@ public enum TokenType {
         String symbol = String.valueOf(character);
 
         // empty symbols - always SKIP
-        if (symbol.matches("[ ]"))
+        if (symbol.matches(SymbolRegex.SKIP))
             return SKIP;
 
         // numbers - INTEGER, FLOAT or VARIABLE
-        if (symbol.matches("[0-9]")) {
+        if (symbol.matches(SymbolRegex.NUMBER)) {
             if (state == FLOAT || state == VARIABLE)
                 return state;
 
@@ -33,7 +33,7 @@ public enum TokenType {
         }
 
         // dots - FLOAT
-        if (symbol.matches("[.]")) {
+        if (symbol.matches(SymbolRegex.FLOAT)) {
             if (state == FLOAT)
                 throw new InvalidSymbolException(character);
 
@@ -41,27 +41,27 @@ public enum TokenType {
         }
 
         // operation symbols - OPERATOR
-        if (symbol.matches("[+\\-/*^%]"))
+        if (symbol.matches(SymbolRegex.OPERATOR))
             return OPERATOR;
 
         // logical symbols - LOGICAL_OPERATOR
-        if (symbol.matches("[&|!]"))
+        if (symbol.matches(SymbolRegex.LOGICAL_OPERATOR))
             return LOGICAL_OPERATOR;
 
         // comma - COMMA
-        if (symbol.matches("[,]"))
+        if (symbol.matches(SymbolRegex.COMMA))
             return COMMA;
 
         // left parenthesis - LPAREN
-        if (symbol.matches("[(]"))
+        if (symbol.matches(SymbolRegex.LPAREN))
             return LPAREN;
 
         // right parenthesis - RPAREN
-        if (symbol.matches("[)]"))
+        if (symbol.matches(SymbolRegex.RPAREN))
             return RPAREN;
 
         // letters and underscores - VARIABLE
-        if (symbol.matches("[A-Za-z_]"))
+        if (symbol.matches(SymbolRegex.TEXT))
             return VARIABLE;
 
         throw new UnknownSymbolException(character);
