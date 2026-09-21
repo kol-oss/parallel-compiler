@@ -7,7 +7,7 @@ import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        String expression = "0.71.11";
+        String expression = "7.111.01";
 
         ExceptionHandler exceptionHandler = new ExceptionHandler();
 

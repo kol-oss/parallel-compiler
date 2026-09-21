@@ -42,7 +42,8 @@ public class Lexer {
         if (buffer.isEmpty())
             return;
 
-        Token token = new Token(buffer.toString(), lastType, lastIndex);
+        String value = buffer.toString();
+        Token token = new Token(value, lastType, lastIndex - value.length() + 1);
         tokens.add(token);
 
         buffer.setLength(0);
