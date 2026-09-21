@@ -59,7 +59,12 @@ public class ExpressionChecker {
         System.out.println(ANSI_RED + "Syntax validation failed: " + ANSI_RESET + errorExpression);
 
         for (SyntaxException exception : exceptions) {
-            System.out.println(ANSI_RED + "> '" + exception.getToken().value() + "': " + exception.getMessage() + ANSI_RESET);
+            Token token = exception.getToken();
+            String opening = "> " + (token != null ?
+                    "'" + token.value() + "': "
+                    : "");
+
+            System.out.println(ANSI_RED + opening + exception.getMessage() + ANSI_RESET);
         }
     }
 

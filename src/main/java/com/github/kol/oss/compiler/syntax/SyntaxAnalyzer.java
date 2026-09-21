@@ -15,21 +15,15 @@ public class SyntaxAnalyzer {
 
     private List<SyntaxException> exceptions;
 
-    private boolean checkTransition(Token token, TokenType nextType) {
+    private void checkTransition(Token token, TokenType nextType) {
         if (!SyntaxTransitions.isAllowedTransition(currentType, nextType)) {
             SyntaxException exception = new SyntaxException(token, "Not allowed transition from " + currentType + " into " + nextType);
             exceptions.add(exception);
-
-            return false;
         }
-
-        return true;
     }
 
     private void processToken(Token token) {
         TokenType nextType = token.type();
-        if (!checkTransition(token, nextType))
-            return;
 
         if (nextType == TokenType.LPAREN) {
             parenthesisCount++;
@@ -41,6 +35,8 @@ public class SyntaxAnalyzer {
                 exceptions.add(exception);
             }
         }
+
+        checkTransition(token, nextType);
     }
 
     public void analyze(List<Token> tokens) {
@@ -58,7 +54,7 @@ public class SyntaxAnalyzer {
         checkTransition(tokens.getLast(), TokenType.END);
 
         if (parenthesisCount > 0) {
-            SyntaxException exception = new SyntaxException(tokens.getLast(), "Expected more closing parenthesis (" + parenthesisCount + ")");
+            SyntaxException exception = new SyntaxException(null, "Expected more closing parenthesis (" + parenthesisCount + ")");
             exceptions.add(exception);
         }
 
