@@ -1,6 +1,7 @@
-package com.github.kol.oss.compiler.lexica;
+package com.github.kol.oss.compiler;
 
 import com.github.kol.oss.compiler.exception.GroupedException;
+import com.github.kol.oss.compiler.lexica.LexicalAnalyzer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;

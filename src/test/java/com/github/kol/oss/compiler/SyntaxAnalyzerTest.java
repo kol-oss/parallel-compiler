@@ -1,6 +1,7 @@
-package com.github.kol.oss.compiler.lexica;
+package com.github.kol.oss.compiler;
 
 import com.github.kol.oss.compiler.exception.GroupedException;
+import com.github.kol.oss.compiler.lexica.LexicalAnalyzer;
 import com.github.kol.oss.compiler.syntax.SyntaxAnalyzer;
 import com.github.kol.oss.compiler.token.Token;
 import org.junit.jupiter.api.DisplayName;
