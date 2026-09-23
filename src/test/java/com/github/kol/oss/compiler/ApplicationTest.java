@@ -54,7 +54,7 @@ public class ApplicationTest {
                 ),
                 Arguments.of(
                         "**f(*k, -p+1, ))2.1.1 + 1.8q((-5x ++ i)",
-                        List.of(0, 1, 4, 8, 14, 15, 16, 19, 20, 30, 35)
+                        List.of(0, 1, 4, 14, 15, 16, 19, 20, 35)
                 ),
                 Arguments.of(
                         "a-+(t*5.81.8-))/",
@@ -62,7 +62,7 @@ public class ApplicationTest {
                 ),
                 Arguments.of(
                         "-a++b-2v*func((t+2-,sin(x/*2.01.2),)/8(-)**",
-                        List.of(3, 19, 19, 26, 31, 32, 34, 35, 38, 39, 40, 42, 42, 42)
+                        List.of(3, 19, 19, 26, 31, 32, 34, 35, 38, 40, 42, 42, 42)
                 )
         );
     }

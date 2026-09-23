@@ -8,8 +8,7 @@ public class TokenTransitions {
             Map.entry(TokenType.START, Set.of(
                     TokenType.INTEGER,
                     TokenType.FLOAT,
-                    TokenType.LOGICAL_OPERATOR,
-                    TokenType.UNARY_OPERATOR,
+                    TokenType.OPERATOR,
                     TokenType.LPAREN,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION
@@ -48,18 +47,12 @@ public class TokenTransitions {
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
                     TokenType.LPAREN,
-                    TokenType.UNARY_OPERATOR
+                    TokenType.OPERATOR
             )),
             Map.entry(TokenType.LOGICAL_OPERATOR, Set.of(
                     TokenType.INTEGER,
                     TokenType.FLOAT,
-                    TokenType.VARIABLE,
-                    TokenType.FUNCTION,
-                    TokenType.LPAREN
-            )),
-            Map.entry(TokenType.UNARY_OPERATOR, Set.of(
-                    TokenType.INTEGER,
-                    TokenType.FLOAT,
+                    TokenType.OPERATOR,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
                     TokenType.LPAREN
@@ -67,19 +60,19 @@ public class TokenTransitions {
             Map.entry(TokenType.COMMA, Set.of(
                     TokenType.INTEGER,
                     TokenType.FLOAT,
+                    TokenType.OPERATOR,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
-                    TokenType.LPAREN,
-                    TokenType.UNARY_OPERATOR
+                    TokenType.LPAREN
             )),
             Map.entry(TokenType.LPAREN, Set.of(
                     TokenType.INTEGER,
                     TokenType.FLOAT,
+                    TokenType.OPERATOR,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
                     TokenType.LPAREN,
-                    TokenType.RPAREN,
-                    TokenType.UNARY_OPERATOR
+                    TokenType.RPAREN
             )),
             Map.entry(TokenType.RPAREN, Set.of(
                     TokenType.OPERATOR,
