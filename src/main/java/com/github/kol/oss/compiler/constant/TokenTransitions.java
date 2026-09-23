@@ -60,7 +60,8 @@ public class TokenTransitions {
                     TokenType.INTEGER,
                     TokenType.FLOAT,
                     TokenType.VARIABLE,
-                    TokenType.FUNCTION
+                    TokenType.FUNCTION,
+                    TokenType.LPAREN
             )),
             Map.entry(TokenType.LPAREN, Set.of(
                     TokenType.INTEGER,
