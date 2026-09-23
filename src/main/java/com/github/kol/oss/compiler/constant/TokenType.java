@@ -43,7 +43,7 @@ public enum TokenType {
 
         // unary operation symbols - OPERATOR
         if (symbol.matches(SymbolRegex.UNARY_OPERATOR)) {
-            if (state == TokenType.START || state == TokenType.OPERATOR)
+            if (state == TokenType.START || state == TokenType.LPAREN || state == TokenType.OPERATOR)
                 return UNARY_OPERATOR;
         }
 
