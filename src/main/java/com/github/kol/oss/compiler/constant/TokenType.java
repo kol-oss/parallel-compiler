@@ -10,6 +10,7 @@ public enum TokenType {
     FUNCTION,
     OPERATOR,
     LOGICAL_OPERATOR,
+    UNARY_OPERATOR,
     LPAREN,
     RPAREN,
     COMMA,
@@ -38,6 +39,12 @@ public enum TokenType {
                 throw new InvalidSymbolException(character);
 
             return FLOAT;
+        }
+
+        // unary operation symbols - OPERATOR
+        if (symbol.matches(SymbolRegex.UNARY_OPERATOR)) {
+            if (state == TokenType.START || state == TokenType.OPERATOR)
+                return UNARY_OPERATOR;
         }
 
         // operation symbols - OPERATOR

@@ -1,6 +1,5 @@
 package com.github.kol.oss.compiler.processor;
 
-import com.github.kol.oss.compiler.constant.SymbolRegex;
 import com.github.kol.oss.compiler.constant.TokenTransitions;
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.Token;
@@ -65,18 +64,6 @@ public class SyntaxProcessor {
     }
 
     private void processToken(Token token) {
-        String value = token.value();
-        TokenType nextType = token.type();
-
-        if (lastType == TokenType.START && nextType == TokenType.OPERATOR) {
-            if (!value.matches(SymbolRegex.START_OPERATOR)) {
-                InvalidValueException exception = new InvalidValueException(lastType, nextType, value);
-                exception.setIndex(token.position());
-
-                exceptionHandler.add(exception);
-            }
-        }
-
         checkStructure(token);
         checkTransition(token);
     }

@@ -33,7 +33,7 @@ public class ApplicationTest {
                 "func(a, b + c, multiply(x, y))",
                 "((x)) + (((y)))",
                 "total / (items + 1) * discount",
-                "calculate(12.5, (x * 4) + 7, result)",
+                "-calculate(12.5, (x * 4) + 7, result)",
                 "process(10, (1 + compute(var_1, 2))) / 10"
         );
     }

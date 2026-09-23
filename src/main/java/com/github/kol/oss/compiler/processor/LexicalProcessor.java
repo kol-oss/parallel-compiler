@@ -15,7 +15,7 @@ public class LexicalProcessor {
     private StringBuilder buffer = new StringBuilder();
     private List<Token> tokens = new ArrayList<>();
 
-    private TokenType lastType = TokenType.SKIP;
+    private TokenType lastType = TokenType.START;
     private int lastIndex = 0;
 
     public LexicalProcessor(ExceptionHandler exceptionHandler) {
@@ -55,7 +55,7 @@ public class LexicalProcessor {
         buffer = new StringBuilder();
         tokens = new ArrayList<>();
 
-        lastType = TokenType.SKIP;
+        lastType = TokenType.START;
         lastIndex = 0;
     }
 
