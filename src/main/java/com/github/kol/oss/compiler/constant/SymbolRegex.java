@@ -5,7 +5,7 @@ public class SymbolRegex {
     public static final String NUMBER = "[0-9]";
     public static final String FLOAT = "[.]";
     public static final String OPERATOR = "[+\\-/*^%]";
-    public static final String LOGICAL_OPERATOR = "[&|!]";
+    public static final String LOGICAL_OPERATOR = "[&|]";
     public static final String UNARY_OPERATOR = "[-]";
     public static final String COMMA = "[,]";
     public static final String LPAREN = "[(]";
