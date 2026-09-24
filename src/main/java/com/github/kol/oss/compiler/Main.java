@@ -25,7 +25,8 @@ public class Main {
             else if (value.equalsIgnoreCase("token")) {
                 isTokenOutput = !isTokenOutput;
                 continue;
-            }
+            } else if (value.isEmpty())
+                continue;
 
             List<Token> tokens = lexicalProcessor.process(value);
             if (isTokenOutput)
