@@ -1,6 +1,6 @@
 package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.dto.Token;
+import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.processor.LexicalProcessor;

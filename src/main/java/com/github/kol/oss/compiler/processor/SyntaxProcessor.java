@@ -4,7 +4,7 @@ import com.github.kol.oss.compiler.constant.OperatorState;
 import com.github.kol.oss.compiler.constant.SymbolRegex;
 import com.github.kol.oss.compiler.constant.TokenTransitions;
 import com.github.kol.oss.compiler.constant.TokenType;
-import com.github.kol.oss.compiler.dto.Token;
+import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.*;
 
 import java.util.HashSet;

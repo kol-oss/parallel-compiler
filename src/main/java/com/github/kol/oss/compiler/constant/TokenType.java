@@ -66,4 +66,15 @@ public enum TokenType {
 
         throw new UnknownSymbolException(character);
     }
+
+    public boolean isOperator() {
+        return this == TokenType.OPERATOR || this == TokenType.LOGICAL_OPERATOR;
+    }
+
+    public boolean isOperand() {
+        return this == TokenType.INTEGER ||
+                this == TokenType.FLOAT ||
+                this == TokenType.VARIABLE ||
+                this == TokenType.FUNCTION;
+    }
 }

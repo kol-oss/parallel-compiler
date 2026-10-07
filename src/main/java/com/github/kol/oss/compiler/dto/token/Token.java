@@ -1,4 +1,4 @@
-package com.github.kol.oss.compiler.dto;
+package com.github.kol.oss.compiler.dto.token;
 
 import com.github.kol.oss.compiler.constant.TokenType;
 

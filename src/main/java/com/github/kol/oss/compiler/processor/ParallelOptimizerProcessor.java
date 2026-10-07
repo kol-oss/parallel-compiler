@@ -1,14 +1,18 @@
-package com.github.kol.oss.compiler.parser;
+package com.github.kol.oss.compiler.processor;
+
+import com.github.kol.oss.compiler.dto.node.OperandNode;
+import com.github.kol.oss.compiler.dto.node.OperatorNode;
+import com.github.kol.oss.compiler.dto.node.Node;
 
 public class ParallelOptimizerProcessor {
 
-    public TreeNode process(TreeNode root) {
-        TreeNode optimizedTree = optimizeOperations(root);
+    public Node process(Node root) {
+        Node optimizedTree = optimizeOperations(root);
         calculateLevels(optimizedTree);
         return optimizedTree;
     }
 
-    private TreeNode optimizeOperations(TreeNode node) {
+    private Node optimizeOperations(Node node) {
         if (node instanceof OperandNode) {
             return node;
         }
@@ -17,18 +21,18 @@ public class ParallelOptimizerProcessor {
         op.setLeft(optimizeOperations(op.getLeft()));
         op.setRight(optimizeOperations(op.getRight()));
 
-        if (op.getOperator().equals("-") && op.getLeft() instanceof OperatorNode) {
+        if (op.getValue().equals("-") && op.getLeft() instanceof OperatorNode) {
             OperatorNode leftOp = (OperatorNode) op.getLeft();
-            if (leftOp.getOperator().equals("-")) {
+            if (leftOp.getValue().equals("-")) {
                 OperatorNode newRight = new OperatorNode("+", leftOp.getRight(), op.getRight());
                 leftOp.setRight(newRight);
                 return optimizeOperations(leftOp);
             }
         }
 
-        if (op.getOperator().equals("/") && op.getLeft() instanceof OperatorNode) {
+        if (op.getValue().equals("/") && op.getLeft() instanceof OperatorNode) {
             OperatorNode leftOp = (OperatorNode) op.getLeft();
-            if (leftOp.getOperator().equals("/")) {
+            if (leftOp.getValue().equals("/")) {
                 OperatorNode newRight = new OperatorNode("*", leftOp.getRight(), op.getRight());
                 leftOp.setRight(newRight);
                 return optimizeOperations(leftOp);
@@ -38,7 +42,7 @@ public class ParallelOptimizerProcessor {
         return op;
     }
 
-    private void calculateLevels(TreeNode node) {
+    private void calculateLevels(Node node) {
         if (node instanceof OperandNode) {
             node.setLevel(0);
             return;

@@ -2,7 +2,7 @@ package com.github.kol.oss.compiler.processor;
 
 import com.github.kol.oss.compiler.constant.TokenLexica;
 import com.github.kol.oss.compiler.constant.TokenType;
-import com.github.kol.oss.compiler.dto.Token;
+import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
 

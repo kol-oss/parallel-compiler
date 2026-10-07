@@ -10,6 +10,10 @@ public class ExceptionHandler {
         exceptions.add(exception);
     }
 
+    public boolean isPresent() {
+        return !exceptions.isEmpty();
+    }
+
     private void sortByIndex() {
         exceptions.sort((o1, o2) -> {
             if (o1.getIndex() == o2.getIndex())

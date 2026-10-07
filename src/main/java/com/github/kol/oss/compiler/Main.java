@@ -1,10 +1,13 @@
 package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.dto.Token;
+import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
-import com.github.kol.oss.compiler.parser.*;
+import com.github.kol.oss.compiler.dto.node.OperatorNode;
+import com.github.kol.oss.compiler.dto.node.Node;
 import com.github.kol.oss.compiler.processor.LexicalProcessor;
+import com.github.kol.oss.compiler.processor.ParallelOptimizerProcessor;
 import com.github.kol.oss.compiler.processor.SyntaxProcessor;
+import com.github.kol.oss.compiler.processor.TreeProcessor;
 
 import java.util.List;
 import java.util.Scanner;
@@ -12,8 +15,11 @@ import java.util.Scanner;
 public class Main {
     public static void main(String[] args) {
         ExceptionHandler exceptionHandler = new ExceptionHandler();
+
         LexicalProcessor lexicalProcessor = new LexicalProcessor(exceptionHandler);
         SyntaxProcessor syntaxProcessor = new SyntaxProcessor(exceptionHandler);
+
+        TreeProcessor treeProcessor = new TreeProcessor();
 
         Scanner scanner = new Scanner(System.in);
         boolean isTokenOutput = false;
@@ -35,31 +41,31 @@ public class Main {
 
             syntaxProcessor.process(tokens);
 
+            boolean isValid = exceptionHandler.isPresent();
             exceptionHandler.printAndClear(value);
             System.out.println();
 
-            TreeBuilderProcessor treeBuilder = new TreeBuilderProcessor();
-            TreeNode rawAst = treeBuilder.buildAst(tokens);
+            if (isValid) {
+                continue;
+            }
 
+            Node rawTree = treeProcessor.buildTree(tokens);
             ParallelOptimizerProcessor optimizer = new ParallelOptimizerProcessor();
-            TreeNode optimizedAst = optimizer.process(rawAst);
+            Node optimizedAst = optimizer.process(rawTree);
 
             System.out.println("Дерево паралельної форми (ЯПФ):");
             printTree(optimizedAst, "", true);
+
         }
     }
 
-    public static void printTree(TreeNode node, String indent, boolean isRight) {
+    public static void printTree(Node node, String indent, boolean isRight) {
         if (node == null) return;
 
-        String val = node instanceof OperatorNode
-                ? ((OperatorNode)node).getOperator()
-                : ((OperandNode)node).getValue();
-
+        String val = node.getValue();
         System.out.println(indent + (isRight ? "└── " : "├── ") + val + " (Ярус: " + node.getLevel() + ")");
 
-        if (node instanceof OperatorNode) {
-            OperatorNode op = (OperatorNode) node;
+        if (node instanceof OperatorNode op) {
             printTree(op.getLeft(), indent + (isRight ? "    " : "│   "), false);
             printTree(op.getRight(), indent + (isRight ? "    " : "│   "), true);
         }
