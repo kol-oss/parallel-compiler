@@ -1,11 +1,11 @@
 package com.github.kol.oss.compiler;
 
+import com.github.kol.oss.compiler.dto.node.Node;
+import com.github.kol.oss.compiler.dto.node.OperatorNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
-import com.github.kol.oss.compiler.dto.node.OperatorNode;
-import com.github.kol.oss.compiler.dto.node.Node;
 import com.github.kol.oss.compiler.processor.LexicalProcessor;
-import com.github.kol.oss.compiler.processor.ParallelOptimizerProcessor;
+import com.github.kol.oss.compiler.processor.OptimizationProcessor;
 import com.github.kol.oss.compiler.processor.SyntaxProcessor;
 import com.github.kol.oss.compiler.processor.TreeProcessor;
 
@@ -50,12 +50,11 @@ public class Main {
             }
 
             Node rawTree = treeProcessor.buildTree(tokens);
-            ParallelOptimizerProcessor optimizer = new ParallelOptimizerProcessor();
+            OptimizationProcessor optimizer = new OptimizationProcessor();
             Node optimizedAst = optimizer.process(rawTree);
 
             System.out.println("Дерево паралельної форми (ЯПФ):");
             printTree(optimizedAst, "", true);
-
         }
     }
 
@@ -63,7 +62,7 @@ public class Main {
         if (node == null) return;
 
         String val = node.getValue();
-        System.out.println(indent + (isRight ? "└── " : "├── ") + val + " (Ярус: " + node.getLevel() + ")");
+        System.out.println(indent + (isRight ? "└── " : "├── ") + val);
 
         if (node instanceof OperatorNode op) {
             printTree(op.getLeft(), indent + (isRight ? "    " : "│   "), false);
