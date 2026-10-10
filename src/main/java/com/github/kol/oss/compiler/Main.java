@@ -56,7 +56,9 @@ public class Main {
             System.out.println("Step 2. Operators validation and Tree building: STARTED");
 
             // building of tree of operations
-            TokenNode operatorTree = optimizationProcessor.process(treeProcessor.buildTree(tokens));
+            TokenNode operatorTree = treeProcessor.balance(
+                    optimizationProcessor.process(treeProcessor.buildTree(tokens))
+            );
 
             if (exceptionHandler.printAndClear(value))
                 continue;
