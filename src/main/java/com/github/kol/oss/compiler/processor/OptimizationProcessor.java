@@ -104,6 +104,8 @@ public class OptimizationProcessor {
                     value = leftValue - rightValue;
                 else if (operatorType == OperatorType.MULTIPLY)
                     value = leftValue * rightValue;
+                else if (operatorType == OperatorType.DIVISION)
+                    value = leftValue / rightValue;
                 else if (operatorType == OperatorType.EXPONENTIATION)
                     value = Math.pow(leftValue, rightValue);
 
