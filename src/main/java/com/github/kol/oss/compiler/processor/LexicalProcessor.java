@@ -1,5 +1,6 @@
 package com.github.kol.oss.compiler.processor;
 
+import com.github.kol.oss.compiler.constant.NumberConstant;
 import com.github.kol.oss.compiler.constant.TokenLexica;
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.token.Token;
@@ -89,6 +90,23 @@ public class LexicalProcessor {
             buffer.append(symbol);
     }
 
+    private void insertZeroBeforeUnaryMinus() {
+        List<Token> normalizedTokens = new ArrayList<>();
+        Token previousToken = null;
+
+        for (Token token : tokens) {
+            if (token.type() == TokenType.OPERATOR && token.value().equals("-") &&
+                    (previousToken == null || previousToken.type() == TokenType.LPAREN)) {
+                normalizedTokens.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
+            }
+
+            normalizedTokens.add(token);
+            previousToken = token;
+        }
+
+        tokens = normalizedTokens;
+    }
+
     public List<Token> process(String expression) {
         clean();
 
@@ -98,6 +116,7 @@ public class LexicalProcessor {
         }
 
         createToken();
+        insertZeroBeforeUnaryMinus();
         return tokens;
     }
 }
