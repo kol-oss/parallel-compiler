@@ -2,17 +2,17 @@ package com.github.kol.oss.compiler.processor;
 
 import com.github.kol.oss.compiler.constant.OperatorPriority;
 import com.github.kol.oss.compiler.constant.TokenType;
+import com.github.kol.oss.compiler.dto.node.OperationNode;
+import com.github.kol.oss.compiler.dto.node.TokenNode;
+import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.dto.node.OperandNode;
-import com.github.kol.oss.compiler.dto.node.OperatorNode;
-import com.github.kol.oss.compiler.dto.node.Node;
 
 import java.util.List;
 import java.util.Stack;
 
 public class TreeProcessor {
-    public Node buildTree(List<Token> tokens) {
-        Stack<Node> nodes = new Stack<>();
+    public TokenNode buildTree(List<Token> tokens) {
+        Stack<TokenNode> nodes = new Stack<>();
         Stack<Token> operators = new Stack<>();
 
         for (Token token : tokens) {
@@ -21,7 +21,7 @@ public class TreeProcessor {
 
             // if not operator or parenthesis - just add as node
             if (tokenType.isOperand()) {
-                nodes.push(new OperandNode(value));
+                nodes.push(new ValueNode(token));
                 continue;
             }
 
@@ -34,7 +34,7 @@ public class TreeProcessor {
             // if closing parenthesis - if there are nested operators, then build node
             if (tokenType == TokenType.RPAREN) {
                 while (!operators.isEmpty() && !(operators.peek().type() == TokenType.LPAREN)) {
-                    OperatorNode node = createOperatorNode(operators.pop(), nodes);
+                    OperationNode node = createParentNode(operators.pop(), nodes);
                     nodes.push(node);
                 }
 
@@ -46,7 +46,7 @@ public class TreeProcessor {
             if (tokenType.isOperator()) {
                 int priority = OperatorPriority.getPriority(value);
                 while (!operators.isEmpty() && OperatorPriority.getPriority(operators.peek().value()) >= priority) {
-                    OperatorNode node = createOperatorNode(operators.pop(), nodes);
+                    OperationNode node = createParentNode(operators.pop(), nodes);
                     nodes.push(node);
                 }
 
@@ -56,17 +56,17 @@ public class TreeProcessor {
 
         // create nodes for left operators
         while (!operators.isEmpty()) {
-            OperatorNode node = createOperatorNode(operators.pop(), nodes);
+            OperationNode node = createParentNode(operators.pop(), nodes);
             nodes.push(node);
         }
 
         return nodes.isEmpty() ? null : nodes.pop();
     }
 
-    private OperatorNode createOperatorNode(Token token, Stack<Node> nodes) {
-        Node right = nodes.pop();
-        Node left = nodes.pop();
+    private OperationNode createParentNode(Token token, Stack<TokenNode> nodes) {
+        TokenNode right = nodes.pop();
+        TokenNode left = nodes.pop();
 
-        return new OperatorNode(token.value(), left, right);
+        return new OperationNode(token, left, right);
     }
 }

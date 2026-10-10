@@ -1,7 +1,7 @@
 package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.dto.node.Node;
-import com.github.kol.oss.compiler.dto.node.OperatorNode;
+import com.github.kol.oss.compiler.dto.node.TokenNode;
+import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.processor.LexicalProcessor;
@@ -49,22 +49,30 @@ public class Main {
                 continue;
             }
 
-            Node rawTree = treeProcessor.buildTree(tokens);
-            OptimizationProcessor optimizer = new OptimizationProcessor();
-            Node optimizedAst = optimizer.process(rawTree);
+            TokenNode rawTree = treeProcessor.buildTree(tokens);
+            OptimizationProcessor optimizer = new OptimizationProcessor(exceptionHandler);
+            TokenNode optimizedAst = optimizer.process(rawTree);
+
+            isValid = exceptionHandler.isPresent();
+            exceptionHandler.printAndClear(value);
+            System.out.println();
+
+            if (isValid) {
+                continue;
+            }
 
             System.out.println("Дерево паралельної форми (ЯПФ):");
             printTree(optimizedAst, "", true);
         }
     }
 
-    public static void printTree(Node node, String indent, boolean isRight) {
+    public static void printTree(TokenNode node, String indent, boolean isRight) {
         if (node == null) return;
 
-        String val = node.getValue();
+        String val = node.getToken().value();
         System.out.println(indent + (isRight ? "└── " : "├── ") + val);
 
-        if (node instanceof OperatorNode op) {
+        if (node instanceof OperationNode op) {
             printTree(op.getLeft(), indent + (isRight ? "    " : "│   "), false);
             printTree(op.getRight(), indent + (isRight ? "    " : "│   "), true);
         }
