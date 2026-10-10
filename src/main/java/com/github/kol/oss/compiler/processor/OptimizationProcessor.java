@@ -88,8 +88,6 @@ public class OptimizationProcessor {
                     exceptionHandler.add(exception);
                     return node;
                 }
-            } else if (value.equals(NumberConstant.ONE)) {
-                return leftNode;
             }
         }
 
