@@ -1,6 +1,7 @@
 package com.github.kol.oss.compiler.processor;
 
 import com.github.kol.oss.compiler.constant.OperatorState;
+import com.github.kol.oss.compiler.constant.SymbolRegex;
 import com.github.kol.oss.compiler.constant.TokenTransitions;
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.token.Token;
@@ -16,7 +17,7 @@ public class SyntaxProcessor {
     private TokenType lastType = TokenType.START;
     private int parenthesisCount = 0;
 
-    private OperatorState operatorState = OperatorState.NOT_ALLOWED;
+    private OperatorState operatorState = OperatorState.UNARY;
 
     public SyntaxProcessor(ExceptionHandler exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
@@ -66,21 +67,25 @@ public class SyntaxProcessor {
     }
 
     private void checkOperation(Token token) {
+        String value = token.value();
         TokenType tokenType = token.type();
 
         if (tokenType == TokenType.OPERATOR) {
-            if (operatorState == OperatorState.NOT_ALLOWED) {
+            if (operatorState == OperatorState.NO) {
                 InvalidTransitionException exception = new InvalidTransitionException(lastType, tokenType);
                 processError(exception, token);
+            } else if (operatorState == OperatorState.UNARY && !value.matches(SymbolRegex.UNARY_OPERATOR)) {
+                InvalidValueException exception = new InvalidValueException(lastType, tokenType, value);
+                processError(exception, token);
             } else {
-                operatorState = operatorState == OperatorState.ALLOWED ?
-                        OperatorState.NOT_ALLOWED :
-                        OperatorState.ALLOWED;
+                operatorState = operatorState == OperatorState.ALL ?
+                        OperatorState.UNARY :
+                        OperatorState.NO;
             }
         } else if (tokenType == TokenType.COMMA || tokenType == TokenType.LPAREN) {
-            operatorState = OperatorState.NOT_ALLOWED;
+            operatorState = OperatorState.UNARY;
         } else {
-            operatorState = OperatorState.ALLOWED;
+            operatorState = OperatorState.ALL;
         }
     }
 
@@ -100,7 +105,7 @@ public class SyntaxProcessor {
         functionParenthesisCount.clear();
 
         lastType = TokenType.START;
-        operatorState = OperatorState.NOT_ALLOWED;
+        operatorState = OperatorState.UNARY;
     }
 
     public void process(List<Token> tokens) {

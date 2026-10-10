@@ -8,6 +8,7 @@ public class TokenTransitions {
             Map.entry(TokenType.START, Set.of(
                     TokenType.INTEGER,
                     TokenType.FLOAT,
+                    TokenType.OPERATOR,
                     TokenType.LPAREN,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION
@@ -45,11 +46,13 @@ public class TokenTransitions {
                     TokenType.FLOAT,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
-                    TokenType.LPAREN
+                    TokenType.LPAREN,
+                    TokenType.OPERATOR
             )),
             Map.entry(TokenType.LOGICAL_OPERATOR, Set.of(
                     TokenType.INTEGER,
                     TokenType.FLOAT,
+                    TokenType.OPERATOR,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
                     TokenType.LPAREN
@@ -65,6 +68,7 @@ public class TokenTransitions {
             Map.entry(TokenType.LPAREN, Set.of(
                     TokenType.INTEGER,
                     TokenType.FLOAT,
+                    TokenType.OPERATOR,
                     TokenType.VARIABLE,
                     TokenType.FUNCTION,
                     TokenType.LPAREN,
