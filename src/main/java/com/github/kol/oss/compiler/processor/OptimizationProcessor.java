@@ -35,29 +35,45 @@ public class OptimizationProcessor {
         left = operatorNode.getLeft();
         right = operatorNode.getRight();
 
-        if (left instanceof OperandNode leftOperand && leftOperand.getValue().equals("0")) {
-            if (operatorType == OperatorType.PLUS)
-                return right;
+        if (left instanceof OperandNode leftOperand) {
+            if (leftOperand.getValue().equals("0")) {
+                if (operatorType == OperatorType.PLUS)
+                    return right;
 
-            if (operatorType == OperatorType.MULTIPLY)
-                return left;
+                if (operatorType == OperatorType.MULTIPLY)
+                    return left;
 
-            if (operatorType == OperatorType.DIVISION)
-                return left;
+                if (operatorType == OperatorType.DIVISION)
+                    return left;
+            }
+            else if (leftOperand.getValue().equals("1")) {
+                if (operatorType == OperatorType.MULTIPLY)
+                    return right;
+            }
         }
 
-        if (right instanceof OperandNode rightOperand && rightOperand.getValue().equals("0")) {
-            if (operatorType == OperatorType.PLUS)
+        if (right instanceof OperandNode rightOperand) {
+            if (rightOperand.getValue().equals("0")) {
+                if (operatorType == OperatorType.PLUS)
+                    return left;
+
+                if (operatorType == OperatorType.MULTIPLY)
+                    return right;
+
+                if (operatorType == OperatorType.MINUS)
+                    return left;
+
+                if (operatorType == OperatorType.DIVISION)
+                    throw new ZeroDivisionException();
+            }
+            else if (rightOperand.getValue().equals("1")) {
                 return left;
+            }
+        }
 
-            if (operatorType == OperatorType.MULTIPLY)
-                return right;
-
-            if (operatorType == OperatorType.MINUS)
-                return left;
-
-            if (operatorType == OperatorType.DIVISION)
-                throw new ZeroDivisionException();
+        // TODO: ADD CALCULATIONS
+        if (left instanceof OperandNode leftOperand && right instanceof OperandNode rightOperand) {
+            System.out.println("CAN BE CALCULATED");
         }
 
         // optimization of sequential patterns
