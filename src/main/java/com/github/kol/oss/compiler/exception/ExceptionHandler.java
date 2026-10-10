@@ -10,10 +10,6 @@ public class ExceptionHandler {
         exceptions.add(exception);
     }
 
-    public boolean isPresent() {
-        return !exceptions.isEmpty();
-    }
-
     private void sortByIndex() {
         exceptions.sort((o1, o2) -> {
             if (o1.getIndex() == o2.getIndex())
@@ -31,13 +27,12 @@ public class ExceptionHandler {
         return result;
     }
 
-    public void printAndClear(String expression) {
-        System.out.printf("%-12s%s%n", "Expression:", expression);
+    public boolean printAndClear(String expression) {
         if (exceptions.isEmpty()) {
-            System.out.println("expression is valid");
-            return;
+            return false;
         }
 
+        System.out.printf("%-12s%s%n", "Expression:", expression);
         sortByIndex();
 
         StringBuilder pointers = new StringBuilder();
@@ -60,5 +55,6 @@ public class ExceptionHandler {
         System.out.println(messages);
 
         exceptions.clear();
+        return true;
     }
 }

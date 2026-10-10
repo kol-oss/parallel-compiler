@@ -1,7 +1,7 @@
 package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
+import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.processor.LexicalProcessor;
@@ -20,6 +20,7 @@ public class Main {
         SyntaxProcessor syntaxProcessor = new SyntaxProcessor(exceptionHandler);
 
         TreeProcessor treeProcessor = new TreeProcessor();
+        OptimizationProcessor optimizationProcessor = new OptimizationProcessor(exceptionHandler);
 
         Scanner scanner = new Scanner(System.in);
         boolean isTokenOutput = false;
@@ -27,6 +28,8 @@ public class Main {
         while (true) {
             System.out.print("Enter: ");
             String value = scanner.nextLine();
+
+            // special commands (end to leave, token to display tokens parsing)
             if (value.equalsIgnoreCase("end"))
                 break;
             else if (value.equalsIgnoreCase("token")) {
@@ -35,46 +38,45 @@ public class Main {
             } else if (value.isEmpty())
                 continue;
 
+            System.out.println("Step 1. Lexical and Syntax validation: STARTED");
+
+            // lexical processing
             List<Token> tokens = lexicalProcessor.process(value);
             if (isTokenOutput)
                 System.out.println(tokens);
 
+            // syntax processing
             syntaxProcessor.process(tokens);
+            if (exceptionHandler.printAndClear(value))
+                continue;
 
-            boolean isValid = exceptionHandler.isPresent();
-            exceptionHandler.printAndClear(value);
+            System.out.println("Step 1. Lexical and Syntax validation: PASSED");
             System.out.println();
 
-            if (isValid) {
+            System.out.println("Step 2. Operators validation and Tree building: STARTED");
+
+            // building of tree of operations
+            TokenNode operatorTree = optimizationProcessor.process(treeProcessor.buildTree(tokens));
+
+            if (exceptionHandler.printAndClear(value))
                 continue;
-            }
 
-            TokenNode rawTree = treeProcessor.buildTree(tokens);
-            OptimizationProcessor optimizer = new OptimizationProcessor(exceptionHandler);
-            TokenNode optimizedAst = optimizer.process(rawTree);
+            System.out.println("Step 2. Operators validation and Tree building: PASSED");
+            displayTree(operatorTree, "", true);
 
-            isValid = exceptionHandler.isPresent();
-            exceptionHandler.printAndClear(value);
             System.out.println();
-
-            if (isValid) {
-                continue;
-            }
-
-            System.out.println("Дерево паралельної форми (ЯПФ):");
-            printTree(optimizedAst, "", true);
         }
     }
 
-    public static void printTree(TokenNode node, String indent, boolean isRight) {
+    public static void displayTree(TokenNode node, String indent, boolean isRight) {
         if (node == null) return;
 
         String val = node.getToken().value();
         System.out.println(indent + (isRight ? "└── " : "├── ") + val);
 
         if (node instanceof OperationNode op) {
-            printTree(op.getLeft(), indent + (isRight ? "    " : "│   "), false);
-            printTree(op.getRight(), indent + (isRight ? "    " : "│   "), true);
+            displayTree(op.getLeft(), indent + (isRight ? "    " : "│   "), false);
+            displayTree(op.getRight(), indent + (isRight ? "    " : "│   "), true);
         }
     }
 }

@@ -1,6 +1,6 @@
 package com.github.kol.oss.compiler.constant;
 
-public enum OperatorType {
+public enum OperatorValue {
     PLUS,
     MINUS,
     MULTIPLY,
@@ -10,7 +10,7 @@ public enum OperatorType {
     AND,
     OP;
 
-    public static String toString(OperatorType operator) {
+    public static String toString(OperatorValue operator) {
         return switch (operator) {
             case PLUS -> "+";
             case MINUS -> "-";

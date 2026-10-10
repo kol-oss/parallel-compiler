@@ -1,7 +1,7 @@
 package com.github.kol.oss.compiler.processor;
 
 import com.github.kol.oss.compiler.constant.NumberConstant;
-import com.github.kol.oss.compiler.constant.OperatorType;
+import com.github.kol.oss.compiler.constant.OperatorValue;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.Optional;
 
 public class OptimizationProcessor {
-    private static final Map<OperatorType, OperatorType> SEQUENCE_REPLACEMENTS = Map.of(
-            OperatorType.MINUS, OperatorType.PLUS,
-            OperatorType.DIVISION, OperatorType.MULTIPLY
+    private static final Map<OperatorValue, OperatorValue> SEQUENCE_REPLACEMENTS = Map.of(
+            OperatorValue.MINUS, OperatorValue.PLUS,
+            OperatorValue.DIVISION, OperatorValue.MULTIPLY
     );
 
     private final ExceptionHandler exceptionHandler;
@@ -36,20 +36,17 @@ public class OptimizationProcessor {
     }
 
     private TokenNode processOperation(OperationNode node) {
-        OperatorType operatorType = TokenMapper.tokenToOperator(node.getToken());
-
-        TokenNode leftNode = node.getLeft();
-        TokenNode rightNode = node.getRight();
+        OperatorValue operatorValue = TokenMapper.tokenToOperator(node.getToken());
 
         // recursive processing of children
-        node.setLeft(process(leftNode));
-        node.setRight(process(rightNode));
+        node.setLeft(process(node.getLeft()));
+        node.setRight(process(node.getRight()));
 
-        leftNode = node.getLeft();
+        TokenNode leftNode = node.getLeft();
         Token leftToken = leftNode.getToken();
         boolean isLeftOperand = leftNode instanceof ValueNode;
 
-        rightNode = node.getRight();
+        TokenNode rightNode = node.getRight();
         Token rightToken = rightNode.getToken();
         boolean isRightOperand = rightNode instanceof ValueNode;
 
@@ -57,34 +54,34 @@ public class OptimizationProcessor {
         if (isLeftOperand) {
             String value = leftToken.value();
             if (value.equals(NumberConstant.ZERO)) {
-                if (operatorType == OperatorType.PLUS)
+                if (operatorValue == OperatorValue.PLUS)
                     return rightNode;
 
-                if (operatorType == OperatorType.MULTIPLY)
+                if (operatorValue == OperatorValue.MULTIPLY)
                     return leftNode;
 
-                if (operatorType == OperatorType.DIVISION)
+                if (operatorValue == OperatorValue.DIVISION)
                     return leftNode;
             } else if (value.equals(NumberConstant.ONE)) {
-                if (operatorType == OperatorType.MULTIPLY)
+                if (operatorValue == OperatorValue.MULTIPLY)
                     return rightNode;
             }
         }
 
         // optimization of right operand
         if (isRightOperand) {
-            String value = rightNode.getToken().value();
+            String value = rightToken.value();
             if (value.equals(NumberConstant.ZERO)) {
-                if (operatorType == OperatorType.PLUS)
+                if (operatorValue == OperatorValue.PLUS)
                     return leftNode;
 
-                if (operatorType == OperatorType.MULTIPLY)
+                if (operatorValue == OperatorValue.MULTIPLY)
                     return rightNode;
 
-                if (operatorType == OperatorType.MINUS)
+                if (operatorValue == OperatorValue.MINUS)
                     return leftNode;
 
-                if (operatorType == OperatorType.DIVISION) {
+                if (operatorValue == OperatorValue.DIVISION) {
                     PositionedException exception = new ZeroDivisionException();
                     exception.setIndex(rightToken.position());
 
@@ -98,7 +95,7 @@ public class OptimizationProcessor {
 
         // optimization of premature calculations
         if (isLeftOperand && isRightOperand) {
-            Optional<Token> result = OperatorUtils.applyOperation(leftNode.getToken(), rightNode.getToken(), operatorType);
+            Optional<Token> result = OperatorUtils.applyOperation(leftNode.getToken(), rightNode.getToken(), operatorValue);
 
             // if both values are numbers then the result can be precalculated
             if (result.isPresent())
@@ -106,7 +103,7 @@ public class OptimizationProcessor {
         }
 
         // optimization of sequential patterns
-        for (Map.Entry<OperatorType, OperatorType> optimization : SEQUENCE_REPLACEMENTS.entrySet()) {
+        for (Map.Entry<OperatorValue, OperatorValue> optimization : SEQUENCE_REPLACEMENTS.entrySet()) {
             boolean isOptimized = optimizeSequence(node, optimization.getKey(), optimization.getValue());
             if (isOptimized)
                 return process(leftNode);
@@ -116,16 +113,16 @@ public class OptimizationProcessor {
     }
 
     // replaces sequence of same operators with more optimized one
-    private boolean optimizeSequence(OperationNode operationNode, OperatorType base, OperatorType replacement) {
-        OperatorType operator = TokenMapper.tokenToOperator(operationNode.getToken());
+    private boolean optimizeSequence(OperationNode operationNode, OperatorValue base, OperatorValue replacement) {
+        OperatorValue operator = TokenMapper.tokenToOperator(operationNode.getToken());
         TokenNode left = operationNode.getLeft();
         TokenNode right = operationNode.getRight();
 
         if (operator == base && left instanceof OperationNode leftNode) {
-            OperatorType leftOperator = TokenMapper.tokenToOperator(leftNode.getToken());
+            OperatorValue leftOperator = TokenMapper.tokenToOperator(leftNode.getToken());
             if (leftOperator == base) {
                 Token rightToken = right.getToken();
-                Token newRightToken = new Token(OperatorType.toString(replacement), rightToken.type(), rightToken.position());
+                Token newRightToken = new Token(OperatorValue.toString(replacement), rightToken.type(), rightToken.position());
 
                 OperationNode newRight = new OperationNode(newRightToken, leftNode.getRight(), right);
                 leftNode.setRight(newRight);

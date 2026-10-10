@@ -1,23 +1,23 @@
 package com.github.kol.oss.compiler.utils;
 
-import com.github.kol.oss.compiler.constant.OperatorType;
+import com.github.kol.oss.compiler.constant.OperatorValue;
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.token.Token;
 
 import java.util.Optional;
 
 public class OperatorUtils {
-    private static double calculate(double left, double right, OperatorType operatorType) {
+    private static double calculate(double left, double right, OperatorValue operatorValue) {
         double result = 0;
-        if (operatorType == OperatorType.PLUS)
+        if (operatorValue == OperatorValue.PLUS)
             result = left + right;
-        else if (operatorType == OperatorType.MINUS)
+        else if (operatorValue == OperatorValue.MINUS)
             result = left - right;
-        else if (operatorType == OperatorType.MULTIPLY)
+        else if (operatorValue == OperatorValue.MULTIPLY)
             result = left * right;
-        else if (operatorType == OperatorType.DIVISION)
+        else if (operatorValue == OperatorValue.DIVISION)
             result = left / right;
-        else if (operatorType == OperatorType.EXPONENTIATION)
+        else if (operatorValue == OperatorValue.EXPONENTIATION)
             result = Math.pow(left, right);
 
         return result;
@@ -27,7 +27,7 @@ public class OperatorUtils {
         return value == (long) value;
     }
 
-    public static Optional<Token> applyOperation(Token leftToken, Token rightToken, OperatorType operatorType) {
+    public static Optional<Token> applyOperation(Token leftToken, Token rightToken, OperatorValue operatorValue) {
         double left, right;
 
         try {
@@ -37,7 +37,7 @@ public class OperatorUtils {
             return Optional.empty();
         }
 
-        double result = calculate(left, right, operatorType);
+        double result = calculate(left, right, operatorValue);
         boolean isFloat = isFloat(result);
 
         return Optional.of(new Token(

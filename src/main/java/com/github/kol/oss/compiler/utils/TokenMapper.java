@@ -1,25 +1,25 @@
 package com.github.kol.oss.compiler.utils;
 
-import com.github.kol.oss.compiler.constant.OperatorType;
+import com.github.kol.oss.compiler.constant.OperatorValue;
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.token.Token;
 
 public class TokenMapper {
-    public static OperatorType tokenToOperator(Token token) {
+    public static OperatorValue tokenToOperator(Token token) {
         TokenType tokenType = token.type();
         if (tokenType != TokenType.OPERATOR)
             throw new IllegalArgumentException("Can not create operator from token that has type " + tokenType);
 
         String value = token.value();
         return switch (value) {
-            case "+" -> OperatorType.PLUS;
-            case "-" -> OperatorType.MINUS;
-            case "*" -> OperatorType.MULTIPLY;
-            case "/" -> OperatorType.DIVISION;
-            case "^" -> OperatorType.EXPONENTIATION;
-            case "%" -> OperatorType.MODULO;
-            case "&" -> OperatorType.AND;
-            case "|" -> OperatorType.OP;
+            case "+" -> OperatorValue.PLUS;
+            case "-" -> OperatorValue.MINUS;
+            case "*" -> OperatorValue.MULTIPLY;
+            case "/" -> OperatorValue.DIVISION;
+            case "^" -> OperatorValue.EXPONENTIATION;
+            case "%" -> OperatorValue.MODULO;
+            case "&" -> OperatorValue.AND;
+            case "|" -> OperatorValue.OP;
             default -> throw new IllegalArgumentException("Unknown operator: " + value);
         };
     }
