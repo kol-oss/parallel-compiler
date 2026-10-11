@@ -5,6 +5,7 @@ import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.processor.LexicalProcessor;
 import com.github.kol.oss.compiler.processor.SyntaxProcessor;
+import com.github.kol.oss.compiler.processor.TreeProcessor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class ApplicationTest {
     static Stream<String> providePositiveCases() {
@@ -34,7 +36,12 @@ public class ApplicationTest {
                 "((x)) + (((y)))",
                 "total / (items + 1) * discount",
                 "-calculate(12.5, (x * 4) + 7, result)",
-                "process(10, (1 + compute(var_1, 2))) / 10"
+                "process(10, (1 + compute(var_1, 2))) / 10",
+                "-2 * -2",
+                "2 * -3 + -4",
+                "a - -b - -c",
+                "-(a + b) * -(c - d)",
+                "5 * -x / -y"
         );
     }
 
@@ -97,5 +104,26 @@ public class ApplicationTest {
         List<Integer> indexes = exceptions.stream().map(PositionedException::getIndex).toList();
 
         assertEquals(errorIndexes, indexes);
+    }
+
+    @ParameterizedTest
+    @DisplayName("Unary minus after operator builds a tree without crashing")
+    @MethodSource("provideUnaryMinusCases")
+    public void givenUnaryMinusAfterOperator_whenTreeBuilt_thenNoException(String expression) {
+        ExceptionHandler exceptionHandler = new ExceptionHandler();
+        List<Token> tokens = new LexicalProcessor(exceptionHandler).process(expression);
+
+        // regression: shunting-yard used to pop an empty stack for "-2 * -2"
+        assertNotNull(new TreeProcessor().balance(new TreeProcessor().buildTree(tokens)));
+    }
+
+    static Stream<String> provideUnaryMinusCases() {
+        return Stream.of(
+                "-2 * -2",
+                "2 * -3 + -4",
+                "a - -b - -c",
+                "-(a + b) * -(c - d)",
+                "5 * -x / -y"
+        );
     }
 }

@@ -90,21 +90,75 @@ public class LexicalProcessor {
             buffer.append(symbol);
     }
 
-    private void insertZeroBeforeUnaryMinus() {
-        List<Token> normalizedTokens = new ArrayList<>();
-        Token previousToken = null;
+    private void normalizeUnaryMinus() {
+        tokens = normalizeUnaryMinus(tokens);
+    }
 
-        for (Token token : tokens) {
-            if (token.type() == TokenType.OPERATOR && token.value().equals("-") &&
-                    (previousToken == null || previousToken.type() == TokenType.LPAREN)) {
-                normalizedTokens.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
+    private List<Token> normalizeUnaryMinus(List<Token> input) {
+        List<Token> result = new ArrayList<>();
+
+        for (int i = 0; i < input.size(); i++) {
+            Token token = input.get(i);
+            Token previous = i == 0 ? null : input.get(i - 1);
+
+            if (!isUnaryMinus(token, previous)) {
+                result.add(token);
+                continue;
             }
 
-            normalizedTokens.add(token);
-            previousToken = token;
+            int factorEnd = findFactorEnd(input, i + 1);
+            List<Token> factor = normalizeUnaryMinus(input.subList(i + 1, factorEnd));
+
+            // leading position (start, after "(" or ","): 0 - <rest>, no extra parentheses needed
+            if (isLeadingPosition(previous)) {
+                result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
+                result.add(token);
+                result.addAll(factor);
+            } else {
+                // after a binary operator: ( 0 - <factor> ), so the negation binds tighter
+                result.add(new Token("(", TokenType.LPAREN, token.position()));
+                result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
+                result.add(token);
+                result.addAll(factor);
+                result.add(new Token(")", TokenType.RPAREN, token.position()));
+            }
+
+            i = factorEnd - 1;
         }
 
-        tokens = normalizedTokens;
+        return result;
+    }
+
+    private boolean isUnaryMinus(Token token, Token previous) {
+        if (token.type() != TokenType.OPERATOR || !token.value().equals("-"))
+            return false;
+
+        return previous == null ||
+                previous.type() == TokenType.LPAREN ||
+                previous.type().isOperator();
+    }
+
+    private boolean isLeadingPosition(Token previous) {
+        return previous == null || previous.type() == TokenType.LPAREN;
+    }
+
+    private int findFactorEnd(List<Token> input, int start) {
+        if (start >= input.size())
+            return start;
+
+        TokenType firstType = input.get(start).type();
+        if (firstType == TokenType.LPAREN || firstType == TokenType.FUNCTION) {
+            int depth = 0;
+            for (int i = start; i < input.size(); i++) {
+                TokenType type = input.get(i).type();
+                if (type == TokenType.LPAREN)
+                    depth++;
+                else if (type == TokenType.RPAREN && --depth == 0)
+                    return i + 1;
+            }
+        }
+
+        return start + 1;
     }
 
     public List<Token> process(String expression) {
@@ -116,7 +170,7 @@ public class LexicalProcessor {
         }
 
         createToken();
-        insertZeroBeforeUnaryMinus();
+        normalizeUnaryMinus();
         return tokens;
     }
 }
