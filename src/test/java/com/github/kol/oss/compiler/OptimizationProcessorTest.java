@@ -83,6 +83,29 @@ public class OptimizationProcessorTest {
     }
 
     @Test
+    @DisplayName("Constant chain collapses to a single value")
+    public void givenConstantChain_whenOptimized_thenCollapsed() {
+        // a + 1 + 2 + 3 + 4  ->  a + 10
+        TokenNode result = optimize("a + 1 + 2 + 3 + 4");
+        OperationNode root = assertInstanceOf(OperationNode.class, result);
+
+        assertEquals("+", root.getToken().value());
+        assertEquals("a", root.getLeft().getToken().value());
+        assertEquals("10", root.getRight().getToken().value());
+    }
+
+    @Test
+    @DisplayName("Multiplication chain collapses to a single value")
+    public void givenMultiplicationChain_whenOptimized_thenCollapsed() {
+        // a * 2 * 3 * 4  ->  a * 24
+        TokenNode result = optimize("a * 2 * 3 * 4");
+        OperationNode root = assertInstanceOf(OperationNode.class, result);
+
+        assertEquals("*", root.getToken().value());
+        assertEquals("24", root.getRight().getToken().value());
+    }
+
+    @Test
     @DisplayName("Applied optimizations are recorded")
     public void givenOptimizableExpression_whenProcessed_thenLogPopulated() {
         assertTrue(processorFor("a * 1 + 0").getOptimizations().size() >= 2);
