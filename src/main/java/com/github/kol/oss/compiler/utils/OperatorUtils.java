@@ -19,11 +19,14 @@ public class OperatorUtils {
             result = left / right;
         else if (operatorValue == OperatorValue.EXPONENTIATION)
             result = Math.pow(left, right);
+        else if (operatorValue == OperatorValue.MODULO)
+            result = left % right;
 
         return result;
     }
 
-    private static boolean isFloat(double value) {
+    // returns true when the value has no fractional part, i.e. it is an integer
+    private static boolean isInteger(double value) {
         return value == (long) value;
     }
 
@@ -38,11 +41,11 @@ public class OperatorUtils {
         }
 
         double result = calculate(left, right, operatorValue);
-        boolean isFloat = isFloat(result);
+        boolean isInteger = isInteger(result);
 
         return Optional.of(new Token(
-                isFloat ? String.valueOf((long) result) : String.valueOf(result),
-                isFloat ? TokenType.FLOAT : TokenType.INTEGER,
+                isInteger ? String.valueOf((long) result) : String.valueOf(result),
+                isInteger ? TokenType.INTEGER : TokenType.FLOAT,
                 leftToken.position()
         ));
     }

@@ -9,11 +9,21 @@ import com.github.kol.oss.compiler.processor.OptimizationProcessor;
 import com.github.kol.oss.compiler.processor.SyntaxProcessor;
 import com.github.kol.oss.compiler.processor.TreeProcessor;
 
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
+import java.util.Optional;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
+        // ensure box-drawing symbols render correctly regardless of the console code page
+        System.setOut(new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8));
+
         ExceptionHandler exceptionHandler = new ExceptionHandler();
 
         LexicalProcessor lexicalProcessor = new LexicalProcessor(exceptionHandler);
@@ -53,20 +63,84 @@ public class Main {
             System.out.println("Step 1. Lexical and Syntax validation: PASSED");
             System.out.println();
 
-            System.out.println("Step 2. Operators validation and Tree building: STARTED");
+            System.out.println("Step 2. Optimization: STARTED");
 
-            // building of tree of operations
-            TokenNode operatorTree = treeProcessor.balance(
-                    optimizationProcessor.process(treeProcessor.buildTree(tokens))
-            );
+            // build the raw tree, then optimize it (logs every applied optimization)
+            optimizationProcessor.getOptimizations().clear();
+            TokenNode optimizedTree = optimizationProcessor.process(treeProcessor.buildTree(tokens));
+
+            // surfaced optimizations (empty list is not shown)
+            List<String> optimizations = optimizationProcessor.getOptimizations();
+            if (!optimizations.isEmpty()) {
+                System.out.println("Applied optimizations:");
+                optimizations.forEach(optimization -> System.out.println("  - " + optimization));
+            } else {
+                System.out.println("No optimizations were applied.");
+            }
 
             if (exceptionHandler.printAndClear(value))
                 continue;
 
-            System.out.println("Step 2. Operators validation and Tree building: PASSED");
+            System.out.println("Step 2. Optimization: PASSED");
+            System.out.println();
+
+            System.out.println("Step 3. Parallel tree building: STARTED");
+
+            // building of tree of operations in parallel form (min height / max width)
+            TokenNode operatorTree = treeProcessor.balance(optimizedTree);
+
+            if (exceptionHandler.printAndClear(value))
+                continue;
+
+            System.out.println("Step 3. Parallel tree building: PASSED");
+            System.out.println();
+
+            // computation of the result (only when the expression is fully constant)
+            Optional<Token> result = treeProcessor.evaluate(operatorTree);
+            result.ifPresent(token -> System.out.println("Result: " + token.value() + "\n"));
+
+            System.out.println("Parallel tree (by levels):");
+            displayTreeByLevels(operatorTree);
+            System.out.println();
+
+            System.out.println("Parallel tree (structure):");
             displayTree(operatorTree, "", true);
 
             System.out.println();
+        }
+    }
+
+    // prints the tree level by level, highlighting the parallel tiers (max width / min height)
+    public static void displayTreeByLevels(TokenNode root) {
+        if (root == null)
+            return;
+
+        Deque<TokenNode> queue = new ArrayDeque<>();
+        queue.add(root);
+
+        int level = 0;
+        while (!queue.isEmpty()) {
+            int levelSize = queue.size();
+            StringBuilder levelLine = new StringBuilder("Level " + level + ": ");
+
+            for (int i = 0; i < levelSize; i++) {
+                TokenNode node = queue.poll();
+
+                if (i > 0)
+                    levelLine.append(" | ");
+
+                levelLine.append(node.getToken().value());
+
+                if (node instanceof OperationNode operation) {
+                    if (operation.getLeft() != null)
+                        queue.add(operation.getLeft());
+                    if (operation.getRight() != null)
+                        queue.add(operation.getRight());
+                }
+            }
+
+            System.out.println(levelLine);
+            level++;
         }
     }
 

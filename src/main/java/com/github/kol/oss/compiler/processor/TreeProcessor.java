@@ -6,9 +6,12 @@ import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
+import com.github.kol.oss.compiler.utils.OperatorUtils;
+import com.github.kol.oss.compiler.utils.TokenMapper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Stack;
 
 public class TreeProcessor {
@@ -63,49 +66,124 @@ public class TreeProcessor {
             nodes.push(node);
         }
 
-        return nodes.isEmpty() ? null : balance(nodes.pop());
+        return nodes.isEmpty() ? null : nodes.pop();
     }
 
+    // Rebuilds the expression tree into a parallel form of minimal height and maximal width.
+    // - "+" and "*" chains are flattened and re-balanced (associative).
+    // - "-" chains become "(a-b)-(c+d)": left half stays a subtraction chain, right half a sum.
+    // - "/" chains become "(a/b)/(c*d)": left half stays a division chain, right half a product.
+    // Sub-expressions (parentheses / different operators) are kept as single operands and balanced recursively.
     public TokenNode balance(TokenNode node) {
         if (!(node instanceof OperationNode operation))
             return node;
 
         String operator = operation.getToken().value();
-        if (isAssociative(operator)) {
-            List<TokenNode> operands = new ArrayList<>();
-            List<Token> operators = new ArrayList<>();
-            collectChain(operation, operator, operands, operators);
-            List<TokenNode> balancedOperands = operands.stream().map(this::balance).toList();
-            return buildBalanced(balancedOperands, operators, 0, balancedOperands.size() - 1);
-        }
-
-        operation.setLeft(balance(operation.getLeft()));
-        operation.setRight(balance(operation.getRight()));
-        return operation;
+        return switch (operator) {
+            case "+", "*", "-", "/" -> balanceChain(operation, operator);
+            default -> {
+                operation.setLeft(balance(operation.getLeft()));
+                operation.setRight(balance(operation.getRight()));
+                yield operation;
+            }
+        };
     }
 
-    private boolean isAssociative(String operator) {
-        return operator.equals("+") || operator.equals("*");
+    private TokenNode balanceChain(OperationNode operation, String operator) {
+        List<TokenNode> operands = new ArrayList<>();
+
+        // "+" and "*" are fully associative, so same-operator sub-chains are flattened too.
+        // "-" and "/" are left-associative, so only the left spine continues the chain.
+        boolean flattenBoth = operator.equals("+") || operator.equals("*");
+        collectChain(operation, operator, operands, flattenBoth);
+
+        List<TokenNode> balancedOperands = operands.stream().map(this::balance).toList();
+        int last = balancedOperands.size() - 1;
+
+        return switch (operator) {
+            case "+" -> buildSum(balancedOperands, 0, last);
+            case "*" -> buildProduct(balancedOperands, 0, last);
+            case "-" -> buildSubtraction(balancedOperands, 0, last);
+            case "/" -> buildDivision(balancedOperands, 0, last);
+            default -> throw new IllegalStateException("Unexpected operator: " + operator);
+        };
     }
 
-    private void collectChain(TokenNode node, String operator, List<TokenNode> operands, List<Token> operators) {
+    private void collectChain(TokenNode node, String operator, List<TokenNode> operands, boolean flattenBoth) {
         if (node instanceof OperationNode operation && operation.getToken().value().equals(operator)) {
-            collectChain(operation.getLeft(), operator, operands, operators);
-            operators.add(operation.getToken());
-            collectChain(operation.getRight(), operator, operands, operators);
+            collectChain(operation.getLeft(), operator, operands, flattenBoth);
+
+            if (flattenBoth)
+                collectChain(operation.getRight(), operator, operands, flattenBoth);
+            else
+                operands.add(operation.getRight());
         } else {
             operands.add(node);
         }
     }
 
-    private TokenNode buildBalanced(List<TokenNode> operands, List<Token> operators, int start, int end) {
+    private TokenNode buildSum(List<TokenNode> operands, int start, int end) {
         if (start == end)
             return operands.get(start);
 
-        int middleOperator = (start + end) / 2;
-        TokenNode left = buildBalanced(operands, operators, start, middleOperator);
-        TokenNode right = buildBalanced(operands, operators, middleOperator + 1, end);
-        return new OperationNode(operators.get(middleOperator), left, right);
+        int middle = (start + end) / 2;
+        return new OperationNode(operatorToken("+"), buildSum(operands, start, middle), buildSum(operands, middle + 1, end));
+    }
+
+    private TokenNode buildProduct(List<TokenNode> operands, int start, int end) {
+        if (start == end)
+            return operands.get(start);
+
+        int middle = (start + end) / 2;
+        return new OperationNode(operatorToken("*"), buildProduct(operands, start, middle), buildProduct(operands, middle + 1, end));
+    }
+
+    // (a - b) - (c + d): the subtracted tail is grouped as a balanced sum and negated as a whole.
+    private TokenNode buildSubtraction(List<TokenNode> operands, int start, int end) {
+        if (start == end)
+            return operands.get(start);
+
+        int middle = (start + end) / 2;
+        TokenNode left = buildSubtraction(operands, start, middle);
+        TokenNode right = buildSum(operands, middle + 1, end);
+        return new OperationNode(operatorToken("-"), left, right);
+    }
+
+    // (a / b) / (c * d): the divisor tail is grouped as a balanced product.
+    private TokenNode buildDivision(List<TokenNode> operands, int start, int end) {
+        if (start == end)
+            return operands.get(start);
+
+        int middle = (start + end) / 2;
+        TokenNode left = buildDivision(operands, start, middle);
+        TokenNode right = buildProduct(operands, middle + 1, end);
+        return new OperationNode(operatorToken("/"), left, right);
+    }
+
+    private Token operatorToken(String value) {
+        return new Token(value, TokenType.OPERATOR, 0);
+    }
+
+    // Evaluates a fully-constant tree, returning its value; empty when any variable is present.
+    public Optional<Token> evaluate(TokenNode node) {
+        if (node instanceof ValueNode value) {
+            try {
+                Double.parseDouble(value.getToken().value());
+                return Optional.of(value.getToken());
+            } catch (NumberFormatException _) {
+                return Optional.empty();
+            }
+        }
+
+        if (node instanceof OperationNode operation) {
+            Optional<Token> left = evaluate(operation.getLeft());
+            Optional<Token> right = evaluate(operation.getRight());
+
+            if (left.isPresent() && right.isPresent())
+                return OperatorUtils.applyOperation(left.get(), right.get(), TokenMapper.tokenToOperator(operation.getToken()));
+        }
+
+        return Optional.empty();
     }
 
     private OperationNode createParentNode(Token token, Stack<TokenNode> nodes) {

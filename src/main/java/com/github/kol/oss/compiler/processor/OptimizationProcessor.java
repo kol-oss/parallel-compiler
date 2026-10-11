@@ -12,19 +12,26 @@ import com.github.kol.oss.compiler.exception.ZeroDivisionException;
 import com.github.kol.oss.compiler.utils.OperatorUtils;
 import com.github.kol.oss.compiler.utils.TokenMapper;
 
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class OptimizationProcessor {
-    private static final Map<OperatorValue, OperatorValue> SEQUENCE_REPLACEMENTS = Map.of(
-            OperatorValue.MINUS, OperatorValue.PLUS,
-            OperatorValue.DIVISION, OperatorValue.MULTIPLY
-    );
-
     private final ExceptionHandler exceptionHandler;
+
+    // human-readable log of every applied optimization, surfaced to the user afterwards
+    private final List<String> optimizations = new ArrayList<>();
 
     public OptimizationProcessor(ExceptionHandler exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
+    }
+
+    public List<String> getOptimizations() {
+        return optimizations;
+    }
+
+    private void record(String message) {
+        optimizations.add(message);
     }
 
     // processes the tree node, if value - return unchanged
@@ -54,17 +61,25 @@ public class OptimizationProcessor {
         if (isLeftOperand) {
             String value = leftToken.value();
             if (value.equals(NumberConstant.ZERO)) {
-                if (operatorValue == OperatorValue.PLUS)
+                if (operatorValue == OperatorValue.PLUS) {
+                    record("0 + " + rightToken.value() + " => " + rightToken.value());
                     return rightNode;
+                }
 
-                if (operatorValue == OperatorValue.MULTIPLY)
+                if (operatorValue == OperatorValue.MULTIPLY) {
+                    record("0 * " + rightToken.value() + " => 0");
                     return leftNode;
+                }
 
-                if (operatorValue == OperatorValue.DIVISION)
+                if (operatorValue == OperatorValue.DIVISION) {
+                    record("0 / " + rightToken.value() + " => 0");
                     return leftNode;
+                }
             } else if (value.equals(NumberConstant.ONE)) {
-                if (operatorValue == OperatorValue.MULTIPLY)
+                if (operatorValue == OperatorValue.MULTIPLY) {
+                    record("1 * " + rightToken.value() + " => " + rightToken.value());
                     return rightNode;
+                }
             }
         }
 
@@ -72,14 +87,20 @@ public class OptimizationProcessor {
         if (isRightOperand) {
             String value = rightToken.value();
             if (value.equals(NumberConstant.ZERO)) {
-                if (operatorValue == OperatorValue.PLUS)
+                if (operatorValue == OperatorValue.PLUS) {
+                    record(leftToken.value() + " + 0 => " + leftToken.value());
                     return leftNode;
+                }
 
-                if (operatorValue == OperatorValue.MULTIPLY)
+                if (operatorValue == OperatorValue.MULTIPLY) {
+                    record(leftToken.value() + " * 0 => 0");
                     return rightNode;
+                }
 
-                if (operatorValue == OperatorValue.MINUS)
+                if (operatorValue == OperatorValue.MINUS) {
+                    record(leftToken.value() + " - 0 => " + leftToken.value());
                     return leftNode;
+                }
 
                 if (operatorValue == OperatorValue.DIVISION) {
                     PositionedException exception = new ZeroDivisionException();
@@ -87,6 +108,16 @@ public class OptimizationProcessor {
 
                     exceptionHandler.add(exception);
                     return node;
+                }
+            } else if (value.equals(NumberConstant.ONE)) {
+                if (operatorValue == OperatorValue.MULTIPLY) {
+                    record(leftToken.value() + " * 1 => " + leftToken.value());
+                    return leftNode;
+                }
+
+                if (operatorValue == OperatorValue.DIVISION) {
+                    record(leftToken.value() + " / 1 => " + leftToken.value());
+                    return leftNode;
                 }
             }
         }
@@ -96,39 +127,12 @@ public class OptimizationProcessor {
             Optional<Token> result = OperatorUtils.applyOperation(leftNode.getToken(), rightNode.getToken(), operatorValue);
 
             // if both values are numbers then the result can be precalculated
-            if (result.isPresent())
+            if (result.isPresent()) {
+                record(leftToken.value() + " " + OperatorValue.toString(operatorValue) + " " + rightToken.value() + " => " + result.get().value());
                 return new ValueNode(result.get());
-        }
-
-        // optimization of sequential patterns
-        for (Map.Entry<OperatorValue, OperatorValue> optimization : SEQUENCE_REPLACEMENTS.entrySet()) {
-            boolean isOptimized = optimizeSequence(node, optimization.getKey(), optimization.getValue());
-            if (isOptimized)
-                return process(leftNode);
-        }
-
-        return node;
-    }
-
-    // replaces sequence of same operators with more optimized one
-    private boolean optimizeSequence(OperationNode operationNode, OperatorValue base, OperatorValue replacement) {
-        OperatorValue operator = TokenMapper.tokenToOperator(operationNode.getToken());
-        TokenNode left = operationNode.getLeft();
-        TokenNode right = operationNode.getRight();
-
-        if (operator == base && left instanceof OperationNode leftNode) {
-            OperatorValue leftOperator = TokenMapper.tokenToOperator(leftNode.getToken());
-            if (leftOperator == base) {
-                Token rightToken = right.getToken();
-                Token newRightToken = new Token(OperatorValue.toString(replacement), rightToken.type(), rightToken.position());
-
-                OperationNode newRight = new OperationNode(newRightToken, leftNode.getRight(), right);
-                leftNode.setRight(newRight);
-
-                return true;
             }
         }
 
-        return false;
+        return node;
     }
 }
