@@ -141,15 +141,17 @@ public class Main {
         }
     }
 
-    public static void displayTree(TokenNode node, String indent, boolean isRight) {
+    public static void displayTree(TokenNode node, String indent, boolean isClosing) {
         if (node == null) return;
 
         String val = node.getToken().value();
-        System.out.println(indent + (isRight ? "└── " : "├── ") + val);
+        System.out.println(indent + (isClosing ? "└── " : "├── ") + val);
 
         if (node instanceof OperationNode op) {
-            displayTree(op.getLeft(), indent + (isRight ? "    " : "│   "), false);
-            displayTree(op.getRight(), indent + (isRight ? "    " : "│   "), true);
+            String newIndent = indent + (isClosing ? "    " : "│   ");
+
+            displayTree(op.getLeft(), newIndent, false);
+            displayTree(op.getRight(), newIndent, true);
         }
     }
 }
