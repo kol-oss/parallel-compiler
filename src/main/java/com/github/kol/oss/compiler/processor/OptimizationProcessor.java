@@ -19,7 +19,6 @@ import java.util.Optional;
 public class OptimizationProcessor {
     private final ExceptionHandler exceptionHandler;
 
-    // human-readable log of every applied optimization, surfaced to the user afterwards
     private final List<String> optimizations = new ArrayList<>();
 
     public OptimizationProcessor(ExceptionHandler exceptionHandler) {

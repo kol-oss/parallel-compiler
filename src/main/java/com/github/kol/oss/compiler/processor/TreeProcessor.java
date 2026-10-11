@@ -70,10 +70,6 @@ public class TreeProcessor {
     }
 
     // Rebuilds the expression tree into a parallel form of minimal height and maximal width.
-    // - "+" and "*" chains are flattened and re-balanced (associative).
-    // - "-" chains become "(a-b)-(c+d)": left half stays a subtraction chain, right half a sum.
-    // - "/" chains become "(a/b)/(c*d)": left half stays a division chain, right half a product.
-    // Sub-expressions (parentheses / different operators) are kept as single operands and balanced recursively.
     public TokenNode balance(TokenNode node) {
         if (!(node instanceof OperationNode operation))
             return node;
@@ -92,8 +88,6 @@ public class TreeProcessor {
     private TokenNode balanceChain(OperationNode operation, String operator) {
         List<TokenNode> operands = new ArrayList<>();
 
-        // "+" and "*" are fully associative, so same-operator sub-chains are flattened too.
-        // "-" and "/" are left-associative, so only the left spine continues the chain.
         boolean flattenBoth = operator.equals("+") || operator.equals("*");
         collectChain(operation, operator, operands, flattenBoth);
 
@@ -164,7 +158,7 @@ public class TreeProcessor {
         return new Token(value, TokenType.OPERATOR, 0);
     }
 
-    // Evaluates a fully-constant tree, returning its value; empty when any variable is present.
+    // Evaluates a fully-constant tree, returning its value
     public Optional<Token> evaluate(TokenNode node) {
         if (node instanceof ValueNode value) {
             try {

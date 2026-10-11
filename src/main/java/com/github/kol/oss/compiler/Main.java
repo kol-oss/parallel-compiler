@@ -13,11 +13,7 @@ import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
-import java.util.Optional;
-import java.util.Scanner;
+import java.util.*;
 
 public class Main {
     public static void main(String[] args) {
@@ -110,7 +106,7 @@ public class Main {
         }
     }
 
-    // prints the tree level by level, highlighting the parallel tiers (max width / min height)
+    // prints the tree level by level, highlighting the parallel tiers
     public static void displayTreeByLevels(TokenNode root) {
         if (root == null)
             return;
@@ -129,7 +125,8 @@ public class Main {
                 if (i > 0)
                     levelLine.append(" | ");
 
-                levelLine.append(node.getToken().value());
+                if (node != null && node.getToken() != null)
+                    levelLine.append(node.getToken().value());
 
                 if (node instanceof OperationNode operation) {
                     if (operation.getLeft() != null)
