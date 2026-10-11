@@ -52,9 +52,7 @@ public class OptimizationProcessor {
         OperationNode operation = (OperationNode) node;
         OperatorValue operatorValue = TokenMapper.tokenToOperator(operation.getToken());
 
-        // associative operators: flatten the whole chain, process each operand, then
-        // fold all numeric operands into a single constant in one pass,
-        // e.g. a + 1 + 2 + 3 + 4  ->  a + 10
+        // flattening the constants into the single value
         if (isAssociative(operatorValue)) {
             List<TokenNode> operands = new ArrayList<>();
             collectChain(operation, operatorValue, operands);
