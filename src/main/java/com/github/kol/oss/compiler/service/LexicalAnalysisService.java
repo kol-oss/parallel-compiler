@@ -1,6 +1,7 @@
-package com.github.kol.oss.compiler.processor;
+package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.constant.NumberConstant;
+import com.github.kol.oss.compiler.constant.OperatorSymbol;
 import com.github.kol.oss.compiler.constant.TokenLexica;
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.token.Token;
@@ -10,7 +11,7 @@ import com.github.kol.oss.compiler.exception.PositionedException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class LexicalProcessor {
+public class LexicalAnalysisService {
     private final ExceptionHandler exceptionHandler;
 
     private StringBuilder buffer = new StringBuilder();
@@ -19,8 +20,21 @@ public class LexicalProcessor {
     private TokenType lastType = TokenType.START;
     private int lastIndex = 0;
 
-    public LexicalProcessor(ExceptionHandler exceptionHandler) {
+    public LexicalAnalysisService(ExceptionHandler exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
+    }
+
+    public List<Token> tokenize(String expression) {
+        clean();
+
+        for (int i = 0; i < expression.length(); i++) {
+            char symbol = expression.charAt(i);
+            processSymbol(symbol, i);
+        }
+
+        createToken();
+        normalizeUnaryMinus();
+        return tokens;
     }
 
     private boolean canCreateToken(TokenType tokenType) {
@@ -109,18 +123,16 @@ public class LexicalProcessor {
             int factorEnd = findFactorEnd(input, i + 1);
             List<Token> factor = normalizeUnaryMinus(input.subList(i + 1, factorEnd));
 
-            // leading position (start, after "(" or ","): 0 - <rest>, no extra parentheses needed
             if (isLeadingPosition(previous)) {
                 result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
                 result.add(token);
                 result.addAll(factor);
             } else {
-                // after a binary operator: ( 0 - <factor> ), so the negation binds tighter
-                result.add(new Token("(", TokenType.LPAREN, token.position()));
+                result.add(new Token(OperatorSymbol.LEFT_PARENTHESIS, TokenType.LPAREN, token.position()));
                 result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
                 result.add(token);
                 result.addAll(factor);
-                result.add(new Token(")", TokenType.RPAREN, token.position()));
+                result.add(new Token(OperatorSymbol.RIGHT_PARENTHESIS, TokenType.RPAREN, token.position()));
             }
 
             i = factorEnd - 1;
@@ -130,7 +142,7 @@ public class LexicalProcessor {
     }
 
     private boolean isUnaryMinus(Token token, Token previous) {
-        if (token.type() != TokenType.OPERATOR || !token.value().equals("-"))
+        if (token.type() != TokenType.OPERATOR || !token.value().equals(OperatorSymbol.MINUS))
             return false;
 
         return previous == null ||
@@ -159,18 +171,5 @@ public class LexicalProcessor {
         }
 
         return start + 1;
-    }
-
-    public List<Token> process(String expression) {
-        clean();
-
-        for (int i = 0; i < expression.length(); i++) {
-            char symbol = expression.charAt(i);
-            processSymbol(symbol, i);
-        }
-
-        createToken();
-        normalizeUnaryMinus();
-        return tokens;
     }
 }

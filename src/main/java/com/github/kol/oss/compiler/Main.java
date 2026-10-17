@@ -1,195 +1,111 @@
 package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.dto.node.FunctionNode;
-import com.github.kol.oss.compiler.dto.node.OperationNode;
+import com.github.kol.oss.compiler.dto.change.TransformationResult;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
-import com.github.kol.oss.compiler.processor.CommutativeProcessor;
-import com.github.kol.oss.compiler.processor.LexicalProcessor;
-import com.github.kol.oss.compiler.processor.OptimizationProcessor;
-import com.github.kol.oss.compiler.processor.SyntaxProcessor;
-import com.github.kol.oss.compiler.processor.TreeProcessor;
-import com.github.kol.oss.compiler.utils.ExpressionPrinter;
+import com.github.kol.oss.compiler.exception.PositionedException;
+import com.github.kol.oss.compiler.service.CommutativeService;
+import com.github.kol.oss.compiler.service.EvaluationService;
+import com.github.kol.oss.compiler.service.LexicalAnalysisService;
+import com.github.kol.oss.compiler.service.OptimizationService;
+import com.github.kol.oss.compiler.service.ParallelFormService;
+import com.github.kol.oss.compiler.service.SyntaxValidationService;
+import com.github.kol.oss.compiler.service.TreeBuildService;
+import com.github.kol.oss.compiler.view.ConsoleView;
 
-import java.io.FileDescriptor;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
 
 public class Main {
-    public static void main(String[] args) {
-        // ensure box-drawing symbols render correctly regardless of the console code page
-        System.setOut(new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8));
+    private static final String STEP_VALIDATION = "Step 1. Lexical and Syntax validation";
+    private static final String STEP_OPTIMIZATION = "Step 2. Optimization";
+    private static final String STEP_COMMUTATIVE = "Step 3. Commutative transformation";
+    private static final String STEP_PARALLEL = "Step 4. Parallel tree building";
+    private static final String END_COMMAND = "end";
+    private static final String TOKEN_COMMAND = "token";
 
+    public static void main(String[] args) {
+        ConsoleView view = new ConsoleView();
         ExceptionHandler exceptionHandler = new ExceptionHandler();
 
-        LexicalProcessor lexicalProcessor = new LexicalProcessor(exceptionHandler);
-        SyntaxProcessor syntaxProcessor = new SyntaxProcessor(exceptionHandler);
+        LexicalAnalysisService lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
+        SyntaxValidationService syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+        TreeBuildService treeBuildService = new TreeBuildService();
+        OptimizationService optimizationService = new OptimizationService(exceptionHandler);
+        CommutativeService commutativeService = new CommutativeService();
+        ParallelFormService parallelFormService = new ParallelFormService();
+        EvaluationService evaluationService = new EvaluationService();
 
-        TreeProcessor treeProcessor = new TreeProcessor();
-        OptimizationProcessor optimizationProcessor = new OptimizationProcessor(exceptionHandler);
-        CommutativeProcessor commutativeProcessor = new CommutativeProcessor();
-
-        Scanner scanner = new Scanner(System.in);
         boolean isTokenOutput = false;
 
         while (true) {
-            System.out.print("Enter: ");
-            String value = scanner.nextLine();
+            String value = view.readLine();
 
-            // special commands (end to leave, token to display tokens parsing)
-            if (value.equalsIgnoreCase("end"))
+            if (value.equalsIgnoreCase(END_COMMAND))
                 break;
-            else if (value.equalsIgnoreCase("token")) {
+
+            if (value.equalsIgnoreCase(TOKEN_COMMAND)) {
                 isTokenOutput = !isTokenOutput;
                 continue;
-            } else if (value.isEmpty())
+            }
+
+            if (value.isEmpty())
                 continue;
 
-            System.out.println("Step 1. Lexical and Syntax validation: STARTED");
+            view.printStepStarted(STEP_VALIDATION);
 
-            // lexical processing
-            List<Token> tokens = lexicalProcessor.process(value);
+            List<Token> tokens = lexicalAnalysisService.tokenize(value);
             if (isTokenOutput)
-                System.out.println(tokens);
+                view.printTokens(tokens);
 
-            // syntax processing
-            syntaxProcessor.process(tokens);
-            if (exceptionHandler.printAndClear(value))
+            syntaxValidationService.validate(tokens);
+            if (failed(view, exceptionHandler, value))
                 continue;
 
-            System.out.println("Step 1. Lexical and Syntax validation: PASSED");
-            System.out.println();
+            view.printStepPassed(STEP_VALIDATION);
 
-            System.out.println("Step 2. Optimization: STARTED");
+            view.printStepStarted(STEP_OPTIMIZATION);
 
-            // build the raw tree, then optimize it (logs every applied optimization)
-            optimizationProcessor.getOptimizations().clear();
-            TokenNode optimizedTree = optimizationProcessor.process(treeProcessor.buildTree(tokens));
+            TransformationResult optimized = optimizationService.optimize(treeBuildService.buildTree(tokens));
+            view.printOptimizations(optimized.applied());
 
-            // surfaced optimizations (empty list is not shown)
-            List<String> optimizations = optimizationProcessor.getOptimizations();
-            if (!optimizations.isEmpty()) {
-                System.out.println("Applied optimizations:");
-                optimizations.forEach(optimization -> System.out.println("  - " + optimization));
-            } else {
-                System.out.println("No optimizations were applied.");
-            }
-
-            if (exceptionHandler.printAndClear(value))
+            if (failed(view, exceptionHandler, value))
                 continue;
 
-            System.out.println("Step 2. Optimization: PASSED");
-            System.out.println();
+            view.printStepPassed(STEP_OPTIMIZATION);
 
-            System.out.println("Step 3. Commutative transformation: STARTED");
+            view.printStepStarted(STEP_COMMUTATIVE);
 
-            // commutative law: terms are sorted by weight and regrouped into balanced branches
-            commutativeProcessor.getTransformations().clear();
-            TokenNode commutedTree = commutativeProcessor.process(optimizedTree);
+            TransformationResult commuted = commutativeService.applyCommutativeLaw(optimized.tree());
+            view.printCommutativeTransformations(commuted.applied());
 
-            // surfaced commutative transformations (empty list is not shown)
-            List<String> transformations = commutativeProcessor.getTransformations();
-            if (!transformations.isEmpty()) {
-                System.out.println("Applied commutative transformations:");
-                transformations.forEach(transformation -> System.out.println("  - " + transformation));
-            } else {
-                System.out.println("No commutative transformations were applied.");
-            }
-
-            if (exceptionHandler.printAndClear(value))
+            if (failed(view, exceptionHandler, value))
                 continue;
 
-            System.out.println("Equivalent form: " + ExpressionPrinter.print(commutedTree));
-            System.out.println();
-            System.out.println("Step 3. Commutative transformation: PASSED");
-            System.out.println();
+            view.printEquivalentForm(commuted.tree());
+            view.printStepPassed(STEP_COMMUTATIVE);
 
-            System.out.println("Step 4. Parallel tree building: STARTED");
+            view.printStepStarted(STEP_PARALLEL);
 
-            // building of tree of operations in parallel form (min height / max width)
-            TokenNode operatorTree = treeProcessor.balance(commutedTree);
+            TokenNode operatorTree = parallelFormService.buildParallelTree(commuted.tree());
 
-            if (exceptionHandler.printAndClear(value))
+            if (failed(view, exceptionHandler, value))
                 continue;
 
-            System.out.println("Step 4. Parallel tree building: PASSED");
-            System.out.println();
+            view.printStepPassed(STEP_PARALLEL);
 
-            // computation of the result (only when the expression is fully constant)
-            Optional<Token> result = treeProcessor.evaluate(operatorTree);
-            result.ifPresent(token -> System.out.println("Result: " + token.value() + "\n"));
-
-            System.out.println("Parallel tree (by levels):");
-            displayTreeByLevels(operatorTree);
-            System.out.println();
-
-            System.out.println("Parallel tree (structure):");
-            displayTree(operatorTree, "", true);
-
-            System.out.println();
+            evaluationService.evaluate(operatorTree).ifPresent(view::printResult);
+            view.printTree(operatorTree);
         }
     }
 
-    // prints the tree level by level, highlighting the parallel tiers
-    public static void displayTreeByLevels(TokenNode root) {
-        if (root == null)
-            return;
+    private static boolean failed(ConsoleView view, ExceptionHandler exceptionHandler, String expression) {
+        List<PositionedException> errors = exceptionHandler.getAllAndClear();
 
-        Deque<TokenNode> queue = new ArrayDeque<>();
-        queue.add(root);
+        if (errors.isEmpty())
+            return false;
 
-        int level = 0;
-        while (!queue.isEmpty()) {
-            int levelSize = queue.size();
-            StringBuilder levelLine = new StringBuilder("Level " + level + ": ");
-
-            for (int i = 0; i < levelSize; i++) {
-                TokenNode node = queue.poll();
-
-                if (i > 0)
-                    levelLine.append(" | ");
-
-                if (node != null && node.getToken() != null)
-                    levelLine.append(node.getToken().value());
-
-                if (node instanceof OperationNode operation) {
-                    if (operation.getLeft() != null)
-                        queue.add(operation.getLeft());
-                    if (operation.getRight() != null)
-                        queue.add(operation.getRight());
-                }
-
-                if (node instanceof FunctionNode function)
-                    queue.addAll(function.getArguments());
-            }
-
-            System.out.println(levelLine);
-            level++;
-        }
-    }
-
-    public static void displayTree(TokenNode node, String indent, boolean isClosing) {
-        if (node == null) return;
-
-        String val = node.getToken().value();
-        System.out.println(indent + (isClosing ? "└── " : "├── ") + val);
-
-        if (node instanceof OperationNode op) {
-            String newIndent = indent + (isClosing ? "    " : "│   ");
-
-            displayTree(op.getLeft(), newIndent, false);
-            displayTree(op.getRight(), newIndent, true);
-        }
-
-        if (node instanceof FunctionNode function) {
-            String newIndent = indent + (isClosing ? "    " : "│   ");
-            List<TokenNode> arguments = function.getArguments();
-
-            for (int i = 0; i < arguments.size(); i++)
-                displayTree(arguments.get(i), newIndent, i == arguments.size() - 1);
-        }
+        view.printErrors(expression, errors);
+        return true;
     }
 }

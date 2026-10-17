@@ -26,35 +26,4 @@ public class ExceptionHandler {
         exceptions.clear();
         return result;
     }
-
-    public boolean printAndClear(String expression) {
-        if (exceptions.isEmpty()) {
-            return false;
-        }
-
-        System.out.printf("%-12s%s%n", "Expression:", expression);
-        sortByIndex();
-
-        StringBuilder pointers = new StringBuilder();
-        pointers.repeat(" ", expression.length());
-
-        StringBuilder messages = new StringBuilder();
-        for (PositionedException exception : exceptions) {
-            int index = exception.getIndex();
-            pointers.setCharAt(index, '^');
-
-            messages
-                    .append("> (")
-                    .append(index)
-                    .append("): ")
-                    .append(exception.getMessage())
-                    .append("\n");
-        }
-
-        System.out.printf("%-12s%s%n", "Errors:", pointers);
-        System.out.println(messages);
-
-        exceptions.clear();
-        return true;
-    }
 }

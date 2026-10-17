@@ -1,4 +1,4 @@
-package com.github.kol.oss.compiler.processor;
+package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.constant.OperatorState;
 import com.github.kol.oss.compiler.constant.SymbolRegex;
@@ -11,7 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class SyntaxProcessor {
+public class SyntaxValidationService {
     private final ExceptionHandler exceptionHandler;
     private final Set<Integer> functionParenthesisCount = new HashSet<>();
     private TokenType lastType = TokenType.START;
@@ -19,8 +19,33 @@ public class SyntaxProcessor {
 
     private OperatorState operatorState = OperatorState.UNARY;
 
-    public SyntaxProcessor(ExceptionHandler exceptionHandler) {
+    public SyntaxValidationService(ExceptionHandler exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
+    }
+
+    public void validate(List<Token> tokens) {
+        if (tokens.isEmpty())
+            return;
+
+        clean();
+        for (Token token : tokens) {
+            processToken(token);
+            lastType = token.type();
+        }
+
+        Token lastToken = tokens.getLast();
+        if (parenthesisCount > 0) {
+            InvalidParenthesisException exception = new InvalidParenthesisException(parenthesisCount);
+            processError(exception, tokens.getLast());
+        }
+
+        checkTransition(new Token(lastToken.value(), TokenType.END, lastToken.position()));
+    }
+
+    private void processToken(Token token) {
+        checkOperation(token);
+        checkStructure(token);
+        checkTransition(token);
     }
 
     private void processError(PositionedException exception, Token token) {
@@ -89,41 +114,11 @@ public class SyntaxProcessor {
         }
     }
 
-    private void processToken(Token token) {
-        // checks unary operators
-        checkOperation(token);
-
-        // checks commas and parenthesis
-        checkStructure(token);
-
-        // checks all other transitions
-        checkTransition(token);
-    }
-
     private void clean() {
         parenthesisCount = 0;
         functionParenthesisCount.clear();
 
         lastType = TokenType.START;
         operatorState = OperatorState.UNARY;
-    }
-
-    public void process(List<Token> tokens) {
-        if (tokens.isEmpty())
-            return;
-
-        clean();
-        for (Token token : tokens) {
-            processToken(token);
-            lastType = token.type();
-        }
-
-        Token lastToken = tokens.getLast();
-        if (parenthesisCount > 0) {
-            InvalidParenthesisException exception = new InvalidParenthesisException(parenthesisCount);
-            processError(exception, tokens.getLast());
-        }
-
-        checkTransition(new Token(lastToken.value(), TokenType.END, lastToken.position()));
     }
 }
