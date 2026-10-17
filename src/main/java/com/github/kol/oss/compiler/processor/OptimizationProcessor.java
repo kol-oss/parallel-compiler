@@ -3,6 +3,7 @@ package com.github.kol.oss.compiler.processor;
 import com.github.kol.oss.compiler.constant.NumberConstant;
 import com.github.kol.oss.compiler.constant.OperatorValue;
 import com.github.kol.oss.compiler.constant.TokenType;
+import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
@@ -49,6 +50,10 @@ public class OptimizationProcessor {
         if (node instanceof ValueNode)
             return node;
 
+        // functions stay opaque, only their arguments can be optimized
+        if (node instanceof FunctionNode function)
+            return processFunction(function);
+
         OperationNode operation = (OperationNode) node;
         OperatorValue operatorValue = TokenMapper.tokenToOperator(operation.getToken());
 
@@ -70,6 +75,13 @@ public class OptimizationProcessor {
 
     private boolean isAssociative(OperatorValue operatorValue) {
         return operatorValue == OperatorValue.PLUS || operatorValue == OperatorValue.MULTIPLY;
+    }
+
+    private TokenNode processFunction(FunctionNode function) {
+        List<TokenNode> arguments = function.getArguments().stream().map(this::process).toList();
+        return arguments.equals(function.getArguments())
+                ? function
+                : new FunctionNode(function.getToken(), arguments);
     }
 
     // collects every operand of a same-operator associative chain into a flat list

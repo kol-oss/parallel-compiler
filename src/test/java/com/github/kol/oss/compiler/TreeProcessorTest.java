@@ -1,14 +1,18 @@
 package com.github.kol.oss.compiler;
 
 import com.github.kol.oss.compiler.constant.TokenType;
+import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
+import com.github.kol.oss.compiler.exception.ExceptionHandler;
+import com.github.kol.oss.compiler.processor.LexicalProcessor;
 import com.github.kol.oss.compiler.processor.TreeProcessor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -113,5 +117,57 @@ public class TreeProcessorTest {
     public void givenExponentiation_whenBalanced_thenNotFlattened() {
         TokenNode balanced = treeProcessor.balance(op("^", number("2"), number("3")));
         assertEquals("^", assertInstanceOf(OperationNode.class, balanced).getToken().value());
+    }
+
+    private TokenNode build(String expression) {
+        List<Token> tokens = new LexicalProcessor(new ExceptionHandler()).process(expression);
+        return treeProcessor.buildTree(tokens);
+    }
+
+    @Test
+    @DisplayName("Function call keeps its name and argument")
+    public void givenFunctionCall_whenTreeBuilt_thenFunctionNode() {
+        FunctionNode function = assertInstanceOf(FunctionNode.class, build("sin(a+b)"));
+
+        assertEquals("sin", function.getToken().value());
+        assertEquals(1, function.getArguments().size());
+
+        OperationNode argument = assertInstanceOf(OperationNode.class, function.getArguments().getFirst());
+        assertEquals("+", argument.getToken().value());
+    }
+
+    @Test
+    @DisplayName("Multi-argument function keeps every argument")
+    public void givenMultiArgumentFunction_whenTreeBuilt_thenAllArgumentsKept() {
+        FunctionNode function = assertInstanceOf(FunctionNode.class, build("sum(10, 20)"));
+
+        assertEquals(2, function.getArguments().size());
+        assertEquals("10", function.getArguments().get(0).getToken().value());
+        assertEquals("20", function.getArguments().get(1).getToken().value());
+    }
+
+    @Test
+    @DisplayName("Function with nested parenthesis argument wraps the whole argument")
+    public void givenNestedFunctionArgument_whenTreeBuilt_thenArgumentComplete() {
+        FunctionNode function = assertInstanceOf(FunctionNode.class, build("foo((a+3)*b)"));
+
+        assertEquals(1, function.getArguments().size());
+        OperationNode argument = assertInstanceOf(OperationNode.class, function.getArguments().getFirst());
+        assertEquals("*", argument.getToken().value());
+    }
+
+    @Test
+    @DisplayName("Balance recurses into function arguments")
+    public void givenFunctionWithChainArgument_whenBalanced_thenArgumentBalanced() {
+        FunctionNode function = assertInstanceOf(FunctionNode.class, treeProcessor.balance(build("sin(a+b+c)")));
+
+        OperationNode argument = assertInstanceOf(OperationNode.class, function.getArguments().getFirst());
+        assertEquals(2, height(argument));
+    }
+
+    @Test
+    @DisplayName("Function expression is not evaluated")
+    public void givenFunctionTree_whenEvaluated_thenEmpty() {
+        assertTrue(treeProcessor.evaluate(build("sin(1)")).isEmpty());
     }
 }

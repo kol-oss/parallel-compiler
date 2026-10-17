@@ -1,13 +1,16 @@
 package com.github.kol.oss.compiler;
 
+import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.ExceptionHandler;
+import com.github.kol.oss.compiler.processor.CommutativeProcessor;
 import com.github.kol.oss.compiler.processor.LexicalProcessor;
 import com.github.kol.oss.compiler.processor.OptimizationProcessor;
 import com.github.kol.oss.compiler.processor.SyntaxProcessor;
 import com.github.kol.oss.compiler.processor.TreeProcessor;
+import com.github.kol.oss.compiler.utils.ExpressionPrinter;
 
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
@@ -27,6 +30,7 @@ public class Main {
 
         TreeProcessor treeProcessor = new TreeProcessor();
         OptimizationProcessor optimizationProcessor = new OptimizationProcessor(exceptionHandler);
+        CommutativeProcessor commutativeProcessor = new CommutativeProcessor();
 
         Scanner scanner = new Scanner(System.in);
         boolean isTokenOutput = false;
@@ -80,15 +84,38 @@ public class Main {
             System.out.println("Step 2. Optimization: PASSED");
             System.out.println();
 
-            System.out.println("Step 3. Parallel tree building: STARTED");
+            System.out.println("Step 3. Commutative transformation: STARTED");
 
-            // building of tree of operations in parallel form (min height / max width)
-            TokenNode operatorTree = treeProcessor.balance(optimizedTree);
+            // commutative law: terms are sorted by weight and regrouped into balanced branches
+            commutativeProcessor.getTransformations().clear();
+            TokenNode commutedTree = commutativeProcessor.process(optimizedTree);
+
+            // surfaced commutative transformations (empty list is not shown)
+            List<String> transformations = commutativeProcessor.getTransformations();
+            if (!transformations.isEmpty()) {
+                System.out.println("Applied commutative transformations:");
+                transformations.forEach(transformation -> System.out.println("  - " + transformation));
+            } else {
+                System.out.println("No commutative transformations were applied.");
+            }
 
             if (exceptionHandler.printAndClear(value))
                 continue;
 
-            System.out.println("Step 3. Parallel tree building: PASSED");
+            System.out.println("Equivalent form: " + ExpressionPrinter.print(commutedTree));
+            System.out.println();
+            System.out.println("Step 3. Commutative transformation: PASSED");
+            System.out.println();
+
+            System.out.println("Step 4. Parallel tree building: STARTED");
+
+            // building of tree of operations in parallel form (min height / max width)
+            TokenNode operatorTree = treeProcessor.balance(commutedTree);
+
+            if (exceptionHandler.printAndClear(value))
+                continue;
+
+            System.out.println("Step 4. Parallel tree building: PASSED");
             System.out.println();
 
             // computation of the result (only when the expression is fully constant)
@@ -134,6 +161,9 @@ public class Main {
                     if (operation.getRight() != null)
                         queue.add(operation.getRight());
                 }
+
+                if (node instanceof FunctionNode function)
+                    queue.addAll(function.getArguments());
             }
 
             System.out.println(levelLine);
@@ -152,6 +182,14 @@ public class Main {
 
             displayTree(op.getLeft(), newIndent, false);
             displayTree(op.getRight(), newIndent, true);
+        }
+
+        if (node instanceof FunctionNode function) {
+            String newIndent = indent + (isClosing ? "    " : "│   ");
+            List<TokenNode> arguments = function.getArguments();
+
+            for (int i = 0; i < arguments.size(); i++)
+                displayTree(arguments.get(i), newIndent, i == arguments.size() - 1);
         }
     }
 }

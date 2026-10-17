@@ -2,12 +2,14 @@ package com.github.kol.oss.compiler.processor;
 
 import com.github.kol.oss.compiler.constant.OperatorPriority;
 import com.github.kol.oss.compiler.constant.TokenType;
+import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.utils.OperatorUtils;
 import com.github.kol.oss.compiler.utils.TokenMapper;
+import com.github.kol.oss.compiler.utils.TreeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,10 +20,18 @@ public class TreeProcessor {
     public TokenNode buildTree(List<Token> tokens) {
         Stack<TokenNode> nodes = new Stack<>();
         Stack<Token> operators = new Stack<>();
+        Stack<Integer> argumentMarks = new Stack<>();
 
         for (Token token : tokens) {
             String value = token.value();
             TokenType tokenType = token.type();
+
+            // functions are unwrapped once their own parenthesis pair closes
+            if (tokenType == TokenType.FUNCTION) {
+                operators.push(token);
+                argumentMarks.push(nodes.size());
+                continue;
+            }
 
             // if not operator or parenthesis - just add as node
             if (tokenType.isOperand()) {
@@ -43,6 +53,18 @@ public class TreeProcessor {
                 }
 
                 operators.pop();
+
+                // the function's own pair sits right above it on the operator stack
+                if (!operators.isEmpty() && operators.peek().type() == TokenType.FUNCTION) {
+                    Token function = operators.pop();
+                    int mark = argumentMarks.pop();
+
+                    List<TokenNode> arguments = new ArrayList<>(nodes.subList(mark, nodes.size()));
+                    while (nodes.size() > mark)
+                        nodes.pop();
+
+                    nodes.push(new FunctionNode(function, arguments));
+                }
                 continue;
             }
 
@@ -71,6 +93,10 @@ public class TreeProcessor {
 
     // Rebuilds the expression tree into a parallel form of minimal height and maximal width.
     public TokenNode balance(TokenNode node) {
+        if (node instanceof FunctionNode function)
+            return new FunctionNode(function.getToken(),
+                    function.getArguments().stream().map(this::balance).toList());
+
         if (!(node instanceof OperationNode operation))
             return node;
 
@@ -117,19 +143,11 @@ public class TreeProcessor {
     }
 
     private TokenNode buildSum(List<TokenNode> operands, int start, int end) {
-        if (start == end)
-            return operands.get(start);
-
-        int middle = (start + end) / 2;
-        return new OperationNode(operatorToken("+"), buildSum(operands, start, middle), buildSum(operands, middle + 1, end));
+        return TreeUtils.buildBalanced(operands.subList(start, end + 1), "+");
     }
 
     private TokenNode buildProduct(List<TokenNode> operands, int start, int end) {
-        if (start == end)
-            return operands.get(start);
-
-        int middle = (start + end) / 2;
-        return new OperationNode(operatorToken("*"), buildProduct(operands, start, middle), buildProduct(operands, middle + 1, end));
+        return TreeUtils.buildBalanced(operands.subList(start, end + 1), "*");
     }
 
     // (a - b) - (c + d): the subtracted tail is grouped as a balanced sum and negated as a whole.
