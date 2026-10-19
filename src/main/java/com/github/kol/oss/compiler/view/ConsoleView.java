@@ -25,15 +25,6 @@ public class ConsoleView {
         return scanner.nextLine();
     }
 
-    public void printStepStarted(String step) {
-        System.out.println(step + ": STARTED");
-    }
-
-    public void printStepPassed(String step) {
-        System.out.println(step + ": PASSED");
-        System.out.println();
-    }
-
     public void printTokens(List<Token> tokens) {
         System.out.println(tokens);
     }
