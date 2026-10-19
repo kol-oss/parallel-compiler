@@ -30,8 +30,10 @@ public class Main {
 
         LexicalAnalysisService lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
         SyntaxValidationService syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+
         TreeBuildService treeBuildService = new TreeBuildService();
         OptimizationService optimizationService = new OptimizationService(exceptionHandler);
+
         CommutativeService commutativeService = new CommutativeService();
         ParallelFormService parallelFormService = new ParallelFormService();
         EvaluationService evaluationService = new EvaluationService();
