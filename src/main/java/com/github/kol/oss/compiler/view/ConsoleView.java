@@ -49,6 +49,16 @@ public class ConsoleView {
         printTransformations(transformations);
     }
 
+    public void printAssociativeTransformations(List<Transformation> transformations) {
+        if (transformations.isEmpty()) {
+            System.out.println("No associative transformations were applied.");
+            return;
+        }
+
+        System.out.println("Applied associative transformations:");
+        printTransformations(transformations);
+    }
+
     public void printEquivalentForm(TokenNode tree) {
         System.out.println("Equivalent form: " + ExpressionFormatter.format(tree));
         System.out.println();

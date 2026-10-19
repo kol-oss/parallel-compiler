@@ -25,6 +25,7 @@ public class Main {
         OptimizationService optimizationService = new OptimizationService(exceptionHandler);
 
         CommutativeService commutativeService = new CommutativeService();
+        AssociativeService associativeService = new AssociativeService();
         ParallelFormService parallelFormService = new ParallelFormService();
         EvaluationService evaluationService = new EvaluationService();
 
@@ -68,8 +69,17 @@ public class Main {
 
             view.printEquivalentForm(commuted.tree());
 
+            // Associative optimizations
+            TransformationResult associated = associativeService.applyAssociativeLaw(commuted.tree());
+            view.printAssociativeTransformations(associated.applied());
+
+            if (failed(view, exceptionHandler, value))
+                continue;
+
+            view.printEquivalentForm(associated.tree());
+
             // Parallel optimizations
-            TokenNode operatorTree = parallelFormService.buildParallelTree(commuted.tree());
+            TokenNode operatorTree = parallelFormService.buildParallelTree(associated.tree());
             if (failed(view, exceptionHandler, value))
                 continue;
 
