@@ -96,21 +96,19 @@ public class OptimizationService {
         }
 
         boolean cancelled = false;
-        if (sum) {
-            List<Term> reduced = cancelOpposites(terms);
+        List<Term> reduced = cancelOpposites(terms);
 
-            if (reduced.size() < terms.size()) {
-                cancelled = true;
+        if (reduced.size() < terms.size()) {
+            cancelled = true;
 
-                if (reduced.isEmpty()) {
-                    TokenNode zero = cancelValue(terms);
-                    replacements.put(operation, zero);
-                    applied.add(new Transformation(operation, zero));
-                    return;
-                }
-
-                terms = reduced;
+            if (reduced.isEmpty()) {
+                TokenNode collapsed = sum ? cancelValue(terms) : oneValue(terms);
+                replacements.put(operation, collapsed);
+                applied.add(new Transformation(operation, collapsed));
+                return;
             }
+
+            terms = reduced;
         }
 
         List<Term> constants = new ArrayList<>();
@@ -204,6 +202,11 @@ public class OptimizationService {
 
     private TokenNode cancelValue(List<Term> terms) {
         Token token = new Token(NumberConstant.ZERO, TokenType.INTEGER, terms.getFirst().node().getToken().position());
+        return NodeFactory.value(token);
+    }
+
+    private TokenNode oneValue(List<Term> terms) {
+        Token token = new Token(NumberConstant.ONE, TokenType.INTEGER, terms.getFirst().node().getToken().position());
         return NodeFactory.value(token);
     }
 

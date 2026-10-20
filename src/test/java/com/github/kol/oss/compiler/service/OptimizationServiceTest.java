@@ -76,6 +76,17 @@ public class OptimizationServiceTest {
         );
     }
 
+    private static Stream<Arguments> provideDivisionIdentityCases() {
+        return Stream.of(
+                Arguments.of("a/a", ValueNode.class, "1"),
+                Arguments.of("(a+b)/(a+b)", ValueNode.class, "1"),
+                Arguments.of("sin(x+1)/sin(x+1)", ValueNode.class, "1"),
+                Arguments.of("a*b/(a*b)", ValueNode.class, "1"),
+                Arguments.of("a/a/b", OperationNode.class, "/"),
+                Arguments.of("a/a*b", ValueNode.class, "b")
+        );
+    }
+
     private static Stream<Arguments> provideNestedDivisionByZeroCases() {
         return Stream.of(
                 Arguments.of("b/(b+b*0-1*b)", List.of(7)),
@@ -159,6 +170,22 @@ public class OptimizationServiceTest {
     @ParameterizedTest
     @MethodSource("provideSubtractionIdentityCases")
     public void givenSubtractingSameTerm_whenOptimize_thenTermsCancel(String expression, Class<?> expectedRootClass, String expectedRootSymbol) {
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        syntaxValidationService.validate(tokens);
+
+        TokenNode tree = treeBuildService.buildTree(tokens);
+        TransformationResult result = optimizationService.optimize(tree);
+
+        TokenNode optimized = result.tree();
+
+        assertNotNull(optimized);
+        assertInstanceOf(expectedRootClass, optimized);
+        assertEquals(expectedRootSymbol, optimized.getToken().value());
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideDivisionIdentityCases")
+    public void givenSameOperandsInFraction_whenOptimize_thenFractionCollapsesToOne(String expression, Class<?> expectedRootClass, String expectedRootSymbol) {
         List<Token> tokens = lexicalAnalysisService.tokenize(expression);
         syntaxValidationService.validate(tokens);
 
