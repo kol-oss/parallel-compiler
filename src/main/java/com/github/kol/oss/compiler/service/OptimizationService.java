@@ -89,10 +89,28 @@ public class OptimizationService {
         }
 
         if (!sum && hasZeroNumerator(terms)) {
-            TokenNode zero = NodeFactory.value(zeroToken());
+            TokenNode zero = zeroValue(terms);
             replacements.put(operation, zero);
             applied.add(new Transformation(operation, zero));
             return;
+        }
+
+        boolean cancelled = false;
+        if (sum) {
+            List<Term> reduced = cancelOpposites(terms);
+
+            if (reduced.size() < terms.size()) {
+                cancelled = true;
+
+                if (reduced.isEmpty()) {
+                    TokenNode zero = cancelValue(terms);
+                    replacements.put(operation, zero);
+                    applied.add(new Transformation(operation, zero));
+                    return;
+                }
+
+                terms = reduced;
+            }
         }
 
         List<Term> constants = new ArrayList<>();
@@ -105,7 +123,12 @@ public class OptimizationService {
         }
 
         if (constants.isEmpty()) {
-            replacements.put(operation, rebuild(chain.family(), terms));
+            TokenNode rebuilt = rebuild(chain.family(), terms);
+            replacements.put(operation, rebuilt);
+
+            if (cancelled)
+                applied.add(new Transformation(operation, rebuilt));
+
             return;
         }
 
@@ -121,7 +144,12 @@ public class OptimizationService {
         boolean safeDrop = isNeutral(folded, sum) && others.getFirst().sign() == TermSign.POSITIVE;
 
         if (constants.size() == 1 && !safeDrop) {
-            replacements.put(operation, rebuild(chain.family(), terms));
+            TokenNode rebuilt = rebuild(chain.family(), terms);
+            replacements.put(operation, rebuilt);
+
+            if (cancelled)
+                applied.add(new Transformation(operation, rebuilt));
+
             return;
         }
 
@@ -130,6 +158,53 @@ public class OptimizationService {
 
         replacements.put(operation, rebuilt);
         applied.add(new Transformation(operation, rebuilt));
+    }
+
+    private List<Term> cancelOpposites(List<Term> terms) {
+        List<Term> result = new ArrayList<>();
+        boolean[] consumed = new boolean[terms.size()];
+
+        for (int i = 0; i < terms.size(); i++) {
+            if (consumed[i])
+                continue;
+
+            int pair = findOpposite(terms, consumed, i);
+
+            if (pair >= 0) {
+                consumed[i] = true;
+                consumed[pair] = true;
+                continue;
+            }
+
+            result.add(terms.get(i));
+        }
+
+        return result;
+    }
+
+    private int findOpposite(List<Term> terms, boolean[] consumed, int index) {
+        Term term = terms.get(index);
+
+        for (int i = index + 1; i < terms.size(); i++)
+            if (!consumed[i] && terms.get(i).sign() != term.sign() && TreeWalker.same(term.node(), terms.get(i).node()))
+                return i;
+
+        return -1;
+    }
+
+    private TokenNode zeroValue(List<Term> terms) {
+        Token token = terms.stream()
+                .filter(term -> isLiteral(term.node(), NumberConstant.ZERO))
+                .map(term -> term.node().getToken())
+                .findFirst()
+                .orElseGet(this::zeroToken);
+
+        return NodeFactory.value(token);
+    }
+
+    private TokenNode cancelValue(List<Term> terms) {
+        Token token = new Token(NumberConstant.ZERO, TokenType.INTEGER, terms.getFirst().node().getToken().position());
+        return NodeFactory.value(token);
     }
 
     private List<Term> replaceFirstConstant(List<Term> terms, Token folded, boolean sum) {

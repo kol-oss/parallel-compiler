@@ -91,4 +91,27 @@ public class TreeWalker {
     public static TokenNode resolve(TokenNode node, Map<TokenNode, TokenNode> replacements) {
         return replacements.getOrDefault(node, node);
     }
+
+    public static boolean same(TokenNode left, TokenNode right) {
+        if (left == right)
+            return true;
+
+        if (left == null || right == null || left.getClass() != right.getClass())
+            return false;
+
+        if (!left.getToken().value().equals(right.getToken().value()))
+            return false;
+
+        List<TokenNode> leftChildren = children(left);
+        List<TokenNode> rightChildren = children(right);
+
+        if (leftChildren.size() != rightChildren.size())
+            return false;
+
+        for (int i = 0; i < leftChildren.size(); i++)
+            if (!same(leftChildren.get(i), rightChildren.get(i)))
+                return false;
+
+        return true;
+    }
 }
