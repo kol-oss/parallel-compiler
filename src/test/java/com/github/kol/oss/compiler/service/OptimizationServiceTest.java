@@ -68,6 +68,21 @@ public class OptimizationServiceTest {
         );
     }
 
+    private static Stream<Arguments> provideSubtractionIdentityCases() {
+        return Stream.of(
+                Arguments.of("x-x", ValueNode.class, "0"),
+                Arguments.of("a-a+b", ValueNode.class, "b"),
+                Arguments.of("5-5", ValueNode.class, "0")
+        );
+    }
+
+    private static Stream<Arguments> provideNestedDivisionByZeroCases() {
+        return Stream.of(
+                Arguments.of("b/(b+b*0-1*b)", List.of(7)),
+                Arguments.of("a*2/0+b/(b+b*0-1*b)-1/(c*2*4.76*(1-2+1))", List.of(4, 13, 33))
+        );
+    }
+
     @BeforeEach
     public void setUp() {
         exceptionHandler = new ExceptionHandler();
@@ -139,5 +154,35 @@ public class OptimizationServiceTest {
         List<PositionedException> errors = exceptionHandler.getAllAndClear();
 
         assertEquals(expectedErrorCount, errors.size());
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideSubtractionIdentityCases")
+    public void givenSubtractingSameTerm_whenOptimize_thenTermsCancel(String expression, Class<?> expectedRootClass, String expectedRootSymbol) {
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        syntaxValidationService.validate(tokens);
+
+        TokenNode tree = treeBuildService.buildTree(tokens);
+        TransformationResult result = optimizationService.optimize(tree);
+
+        TokenNode optimized = result.tree();
+
+        assertNotNull(optimized);
+        assertInstanceOf(expectedRootClass, optimized);
+        assertEquals(expectedRootSymbol, optimized.getToken().value());
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideNestedDivisionByZeroCases")
+    public void givenDivisorCollapsingToZero_whenOptimize_thenEveryDivisorReported(String expression, List<Integer> expectedErrorIndexes) {
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        syntaxValidationService.validate(tokens);
+
+        TokenNode tree = treeBuildService.buildTree(tokens);
+        optimizationService.optimize(tree);
+
+        List<PositionedException> errors = exceptionHandler.getAllAndClear();
+
+        assertEquals(expectedErrorIndexes, errors.stream().map(PositionedException::getIndex).toList());
     }
 }

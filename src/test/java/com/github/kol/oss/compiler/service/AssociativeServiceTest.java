@@ -61,10 +61,20 @@ public class AssociativeServiceTest {
         );
     }
 
+    private static Stream<Arguments> provideClosedParenthesesCases() {
+        return Stream.of(
+                Arguments.of("a-b*k+b*t-f*f*5.9+f*q+g*f*5.9-g*q-f/(d+q-w)-g/(d+q-w)",
+                        "((((g-f)*((5.9*f)-q))+((b*(t-k))+a))-((f+g)/((d+q)-w)))"),
+                Arguments.of("a-b*k+b*t-b*f*f*5.9+b*f*q+b*g*f*5.9-b*g*q-b*w/p+b*y*m/p-b*y/p-x*x/(d+q-w)+3*x/(d+q-w)+3*x/(d+q-w)+3*3/(d+q-w)",
+                        "((((x*((3+3)-x))+9)/((d+q)-w))+((b*(((((f*5.9)-q)*(g-f))+((((y*(m-1))-w)/p)+t))-k))+a))")
+        );
+    }
+
     private static Stream<Arguments> provideRecordedTransformationCases() {
         return Stream.of(
                 Arguments.of("a*b+a*c+b*c", 1),
                 Arguments.of("a/(b-1)-c/(b-1)+2/(b-1)-t", 1),
+                Arguments.of("a-b*k+b*t-f*f*5.9+f*q+g*f*5.9-g*q-f/(d+q-w)-g/(d+q-w)", 1),
                 Arguments.of("a+b", 0)
         );
     }
@@ -106,6 +116,16 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideCommonDivisorCases")
     public void givenSumWithCommonDivisor_whenApplyAssociative_thenTermsGroupedOverCommonDivisor(String expression, String expectedExpressionFormKey) {
+        TransformationResult result = applyAssociative(expression);
+        TokenNode associated = result.tree();
+
+        assertNotNull(associated);
+        assertEquals(expectedExpressionFormKey, toKey(associated));
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideClosedParenthesesCases")
+    public void givenSumWithScatteredFactors_whenApplyAssociative_thenCommonParenthesesClosed(String expression, String expectedExpressionFormKey) {
         TransformationResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
