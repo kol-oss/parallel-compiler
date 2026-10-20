@@ -9,15 +9,17 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.utils.NodeFactory;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
-import java.util.Stack;
 
 public class TreeBuildService {
     public TokenNode buildTree(List<Token> tokens) {
-        Stack<TokenNode> nodes = new Stack<>();
-        Stack<Token> operators = new Stack<>();
-        Stack<Integer> argumentMarks = new Stack<>();
+        Deque<TokenNode> nodes = new ArrayDeque<>();
+        Deque<Token> operators = new ArrayDeque<>();
+        Deque<Integer> argumentMarks = new ArrayDeque<>();
 
         for (Token token : tokens) {
             String value = token.value();
@@ -50,10 +52,11 @@ public class TreeBuildService {
                     Token function = operators.pop();
                     int mark = argumentMarks.pop();
 
-                    List<TokenNode> arguments = new ArrayList<>(nodes.subList(mark, nodes.size()));
+                    List<TokenNode> arguments = new ArrayList<>();
                     while (nodes.size() > mark)
-                        nodes.pop();
+                        arguments.add(nodes.pop());
 
+                    Collections.reverse(arguments);
                     nodes.push(NodeFactory.function(function, arguments));
                 }
                 continue;
@@ -72,7 +75,10 @@ public class TreeBuildService {
         while (!operators.isEmpty())
             nodes.push(createOperation(operators.pop(), nodes));
 
-        return nodes.isEmpty() ? null : nodes.pop();
+        if (nodes.size() != 1)
+            throw new IllegalStateException("Expression must produce exactly one operand but produced " + nodes.size());
+
+        return nodes.pop();
     }
 
     private boolean outranks(Token pending, int priority, String value) {
@@ -84,7 +90,7 @@ public class TreeBuildService {
                 (pendingPriority == priority && !value.equals(OperatorSymbol.EXPONENTIATION));
     }
 
-    private OperationNode createOperation(Token token, Stack<TokenNode> nodes) {
+    private OperationNode createOperation(Token token, Deque<TokenNode> nodes) {
         TokenNode right = nodes.pop();
         TokenNode left = nodes.pop();
 

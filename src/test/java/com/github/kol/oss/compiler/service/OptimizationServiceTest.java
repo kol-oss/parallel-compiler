@@ -1,12 +1,11 @@
 package com.github.kol.oss.compiler.service;
 
-import com.github.kol.oss.compiler.dto.change.TransformationResult;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
+import com.github.kol.oss.compiler.pipeline.PassResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -18,8 +17,6 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class OptimizationServiceTest {
-    private ExceptionHandler exceptionHandler;
-
     private LexicalAnalysisService lexicalAnalysisService;
     private SyntaxValidationService syntaxValidationService;
 
@@ -96,23 +93,21 @@ public class OptimizationServiceTest {
 
     @BeforeEach
     public void setUp() {
-        exceptionHandler = new ExceptionHandler();
-
-        lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
-        syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+        lexicalAnalysisService = new LexicalAnalysisService();
+        syntaxValidationService = new SyntaxValidationService();
 
         treeBuildService = new TreeBuildService();
-        optimizationService = new OptimizationService(exceptionHandler);
+        optimizationService = new OptimizationService();
     }
 
     @ParameterizedTest
     @MethodSource("provideConstantCases")
     public void givenExpressionWithConstants_whenOptimize_thenFoldsToValue(String expression, String expectedValue) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult result = optimizationService.optimize(tree);
+        PassResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -124,11 +119,11 @@ public class OptimizationServiceTest {
     @ParameterizedTest
     @MethodSource("provideChainCases")
     public void givenChainWithConstants_whenOptimize_thenConstantsFolded(String expression, String expectedValue) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult result = optimizationService.optimize(tree);
+        PassResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -140,11 +135,11 @@ public class OptimizationServiceTest {
     @ParameterizedTest
     @MethodSource("provideNeutralElementCases")
     public void givenExpressionWithNeutralElement_whenOptimize_thenNeutralRemoved(String expression, Class<?> expectedRootClass, String expectedRootSymbol) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult result = optimizationService.optimize(tree);
+        PassResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -156,13 +151,12 @@ public class OptimizationServiceTest {
     @ParameterizedTest
     @MethodSource("provideDivisionByZeroCases")
     public void givenDivisionByZero_whenOptimize_thenErrorReported(String expression, int expectedErrorCount) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        optimizationService.optimize(tree);
 
-        List<PositionedException> errors = exceptionHandler.getAllAndClear();
+        List<PositionedException> errors = optimizationService.apply(tree).diagnostics();
 
         assertEquals(expectedErrorCount, errors.size());
     }
@@ -170,11 +164,11 @@ public class OptimizationServiceTest {
     @ParameterizedTest
     @MethodSource("provideSubtractionIdentityCases")
     public void givenSubtractingSameTerm_whenOptimize_thenTermsCancel(String expression, Class<?> expectedRootClass, String expectedRootSymbol) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult result = optimizationService.optimize(tree);
+        PassResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -186,11 +180,11 @@ public class OptimizationServiceTest {
     @ParameterizedTest
     @MethodSource("provideDivisionIdentityCases")
     public void givenSameOperandsInFraction_whenOptimize_thenFractionCollapsesToOne(String expression, Class<?> expectedRootClass, String expectedRootSymbol) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult result = optimizationService.optimize(tree);
+        PassResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -202,13 +196,12 @@ public class OptimizationServiceTest {
     @ParameterizedTest
     @MethodSource("provideNestedDivisionByZeroCases")
     public void givenDivisorCollapsingToZero_whenOptimize_thenEveryDivisorReported(String expression, List<Integer> expectedErrorIndexes) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        optimizationService.optimize(tree);
 
-        List<PositionedException> errors = exceptionHandler.getAllAndClear();
+        List<PositionedException> errors = optimizationService.apply(tree).diagnostics();
 
         assertEquals(expectedErrorIndexes, errors.stream().map(PositionedException::getIndex).toList());
     }

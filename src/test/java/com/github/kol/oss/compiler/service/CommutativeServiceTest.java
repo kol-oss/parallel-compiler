@@ -1,9 +1,8 @@
 package com.github.kol.oss.compiler.service;
 
-import com.github.kol.oss.compiler.dto.change.TransformationResult;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
+import com.github.kol.oss.compiler.pipeline.PassResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -17,8 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class CommutativeServiceTest {
-    private ExceptionHandler exceptionHandler;
-
     private LexicalAnalysisService lexicalAnalysisService;
     private SyntaxValidationService syntaxValidationService;
 
@@ -59,27 +56,18 @@ public class CommutativeServiceTest {
 
     @BeforeEach
     public void setUp() {
-        exceptionHandler = new ExceptionHandler();
-
-        lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
-        syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+        lexicalAnalysisService = new LexicalAnalysisService();
+        syntaxValidationService = new SyntaxValidationService();
 
         treeBuildService = new TreeBuildService();
-        optimizationService = new OptimizationService(exceptionHandler);
+        optimizationService = new OptimizationService();
         commutativeService = new CommutativeService();
     }
 
     @ParameterizedTest
     @MethodSource("provideHeavierTermsReorderedCases")
     public void givenSumWithDifferentWeights_whenApplyCommutative_thenHeavierTermsReordered(String expression, String expectedExpressionFormKey) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
-        syntaxValidationService.validate(tokens);
-
-        TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult optimized = optimizationService.optimize(tree);
-        TransformationResult result = commutativeService.applyCommutativeLaw(optimized.tree());
-
-        TokenNode commuted = result.tree();
+        TokenNode commuted = applyCommutative(expression);
 
         assertNotNull(commuted);
         assertEquals(expectedExpressionFormKey, toKey(commuted));
@@ -88,14 +76,7 @@ public class CommutativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideHeavierFactorsReorderedCases")
     public void givenProductWithDifferentWeights_whenApplyCommutative_thenHeavierFactorsReordered(String expression, String expectedExpressionFormKey) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
-        syntaxValidationService.validate(tokens);
-
-        TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult optimized = optimizationService.optimize(tree);
-        TransformationResult result = commutativeService.applyCommutativeLaw(optimized.tree());
-
-        TokenNode commuted = result.tree();
+        TokenNode commuted = applyCommutative(expression);
 
         assertNotNull(commuted);
         assertEquals(expectedExpressionFormKey, toKey(commuted));
@@ -104,14 +85,7 @@ public class CommutativeServiceTest {
     @ParameterizedTest
     @MethodSource("providePositivesAndNegativesSeparatedCases")
     public void givenSignedChain_whenApplyCommutative_thenPositivesAndNegativesSeparated(String expression, String expectedExpressionFormKey) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
-        syntaxValidationService.validate(tokens);
-
-        TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult optimized = optimizationService.optimize(tree);
-        TransformationResult result = commutativeService.applyCommutativeLaw(optimized.tree());
-
-        TokenNode commuted = result.tree();
+        TokenNode commuted = applyCommutative(expression);
 
         assertNotNull(commuted);
         assertEquals(expectedExpressionFormKey, toKey(commuted));
@@ -120,16 +94,19 @@ public class CommutativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideCancelledTermsCases")
     public void givenSumWithCancelledTerms_whenApplyCommutative_thenRemainingTermsReordered(String expression, String expectedExpressionFormKey) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
-        syntaxValidationService.validate(tokens);
-
-        TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult optimized = optimizationService.optimize(tree);
-        TransformationResult result = commutativeService.applyCommutativeLaw(optimized.tree());
-
-        TokenNode commuted = result.tree();
+        TokenNode commuted = applyCommutative(expression);
 
         assertNotNull(commuted);
         assertEquals(expectedExpressionFormKey, toKey(commuted));
+    }
+
+    private TokenNode applyCommutative(String expression) {
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
+        syntaxValidationService.validate(tokens);
+
+        TokenNode tree = treeBuildService.buildTree(tokens);
+        PassResult optimized = optimizationService.apply(tree);
+
+        return commutativeService.apply(optimized.tree()).tree();
     }
 }

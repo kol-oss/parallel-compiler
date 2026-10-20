@@ -20,9 +20,22 @@ public class ConsoleView {
         System.setOut(new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8));
     }
 
-    public String readLine() {
+    public void printInputLine() {
         System.out.print("Enter: ");
+    }
+
+    public String readLine() {
         return scanner.nextLine();
+    }
+
+    public boolean hasNextLine() {
+        return scanner.hasNextLine();
+    }
+
+    public void printFailure(String expression, RuntimeException exception) {
+        System.out.printf("%-12s%s%n", "Expression:", expression);
+        System.out.printf("%-12s%s%n", "Failure:", exception.getMessage());
+        System.out.println();
     }
 
     public void printTokens(List<Token> tokens) {

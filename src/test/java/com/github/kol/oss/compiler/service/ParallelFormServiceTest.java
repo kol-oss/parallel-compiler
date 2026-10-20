@@ -2,7 +2,6 @@ package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -16,8 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class ParallelFormServiceTest {
-    private ExceptionHandler exceptionHandler;
-
     private LexicalAnalysisService lexicalAnalysisService;
     private SyntaxValidationService syntaxValidationService;
 
@@ -65,13 +62,11 @@ public class ParallelFormServiceTest {
 
     @BeforeEach
     public void setUp() {
-        exceptionHandler = new ExceptionHandler();
-
-        lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
-        syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+        lexicalAnalysisService = new LexicalAnalysisService();
+        syntaxValidationService = new SyntaxValidationService();
 
         treeBuildService = new TreeBuildService();
-        optimizationService = new OptimizationService(exceptionHandler);
+        optimizationService = new OptimizationService();
         commutativeService = new CommutativeService();
 
         parallelFormService = new ParallelFormService();
@@ -114,13 +109,13 @@ public class ParallelFormServiceTest {
     }
 
     private TokenNode buildParallelForm(String expression) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TokenNode optimized = optimizationService.optimize(tree).tree();
-        TokenNode commuted = commutativeService.applyCommutativeLaw(optimized).tree();
+        TokenNode optimized = optimizationService.apply(tree).tree();
+        TokenNode commuted = commutativeService.apply(optimized).tree();
 
-        return parallelFormService.buildParallelTree(commuted);
+        return parallelFormService.apply(commuted).tree();
     }
 }

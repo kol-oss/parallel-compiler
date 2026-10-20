@@ -2,7 +2,6 @@ package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -14,7 +13,6 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class LexicalAnalysisServiceTest {
-    private ExceptionHandler exceptionHandler;
     private LexicalAnalysisService lexicalAnalysisService;
 
     private static Stream<Arguments> provideNumbersCases() {
@@ -161,8 +159,7 @@ public class LexicalAnalysisServiceTest {
 
     @BeforeEach
     public void setUp() {
-        exceptionHandler = new ExceptionHandler();
-        lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
+        lexicalAnalysisService = new LexicalAnalysisService();
     }
 
     @ParameterizedTest
@@ -202,7 +199,7 @@ public class LexicalAnalysisServiceTest {
     }
 
     private void assertTokens(String expression, List<Token> expectedTokens) {
-        List<Token> actualTokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> actualTokens = lexicalAnalysisService.tokenize(expression).tokens();
 
         assertEquals(expectedTokens.size(), actualTokens.size());
 

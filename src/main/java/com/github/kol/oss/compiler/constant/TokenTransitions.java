@@ -16,8 +16,6 @@ public class TokenTransitions {
             Map.entry(TokenType.INTEGER, Set.of(
                     TokenType.OPERATOR,
                     TokenType.LOGICAL_OPERATOR,
-                    TokenType.VARIABLE,
-                    TokenType.FUNCTION,
                     TokenType.RPAREN,
                     TokenType.COMMA,
                     TokenType.END
@@ -25,8 +23,6 @@ public class TokenTransitions {
             Map.entry(TokenType.FLOAT, Set.of(
                     TokenType.OPERATOR,
                     TokenType.LOGICAL_OPERATOR,
-                    TokenType.VARIABLE,
-                    TokenType.FUNCTION,
                     TokenType.RPAREN,
                     TokenType.COMMA,
                     TokenType.END

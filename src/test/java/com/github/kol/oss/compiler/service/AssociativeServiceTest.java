@@ -1,9 +1,8 @@
 package com.github.kol.oss.compiler.service;
 
-import com.github.kol.oss.compiler.dto.change.TransformationResult;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
+import com.github.kol.oss.compiler.pipeline.PassResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -17,8 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class AssociativeServiceTest {
-    private ExceptionHandler exceptionHandler;
-
     private LexicalAnalysisService lexicalAnalysisService;
     private SyntaxValidationService syntaxValidationService;
 
@@ -81,13 +78,11 @@ public class AssociativeServiceTest {
 
     @BeforeEach
     public void setUp() {
-        exceptionHandler = new ExceptionHandler();
-
-        lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
-        syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+        lexicalAnalysisService = new LexicalAnalysisService();
+        syntaxValidationService = new SyntaxValidationService();
 
         treeBuildService = new TreeBuildService();
-        optimizationService = new OptimizationService(exceptionHandler);
+        optimizationService = new OptimizationService();
 
         commutativeService = new CommutativeService();
         associativeService = new AssociativeService();
@@ -96,7 +91,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideCommonMultiplierCases")
     public void givenSumWithCommonMultiplier_whenApplyAssociative_thenTermsGroupedByCommonFactor(String expression, String expectedExpressionFormKey) {
-        TransformationResult result = applyAssociative(expression);
+        PassResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -106,7 +101,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideSharedBracketCases")
     public void givenSumWithSharedBracket_whenApplyAssociative_thenBracketClosedOverCommonFactor(String expression, String expectedExpressionFormKey) {
-        TransformationResult result = applyAssociative(expression);
+        PassResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -116,7 +111,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideCommonDivisorCases")
     public void givenSumWithCommonDivisor_whenApplyAssociative_thenTermsGroupedOverCommonDivisor(String expression, String expectedExpressionFormKey) {
-        TransformationResult result = applyAssociative(expression);
+        PassResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -126,7 +121,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideClosedParenthesesCases")
     public void givenSumWithScatteredFactors_whenApplyAssociative_thenCommonParenthesesClosed(String expression, String expectedExpressionFormKey) {
-        TransformationResult result = applyAssociative(expression);
+        PassResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -136,7 +131,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideWithoutCommonFactorCases")
     public void givenSumWithoutCommonFactor_whenApplyAssociative_thenExpressionStaysUnchanged(String expression, String expectedExpressionFormKey) {
-        TransformationResult result = applyAssociative(expression);
+        PassResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -146,19 +141,19 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideRecordedTransformationCases")
     public void givenExpression_whenApplyAssociative_thenTransformationsRecorded(String expression, int expectedTransformations) {
-        TransformationResult result = applyAssociative(expression);
+        PassResult result = applyAssociative(expression);
 
         assertEquals(expectedTransformations, result.applied().size());
     }
 
-    private TransformationResult applyAssociative(String expression) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+    private PassResult applyAssociative(String expression) {
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TokenNode optimized = optimizationService.optimize(tree).tree();
-        TokenNode commuted = commutativeService.applyCommutativeLaw(optimized).tree();
+        TokenNode optimized = optimizationService.apply(tree).tree();
+        TokenNode commuted = commutativeService.apply(optimized).tree();
 
-        return associativeService.applyAssociativeLaw(commuted);
+        return associativeService.apply(commuted);
     }
 }

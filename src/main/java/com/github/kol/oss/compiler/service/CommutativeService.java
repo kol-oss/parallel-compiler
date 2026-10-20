@@ -1,76 +1,31 @@
 package com.github.kol.oss.compiler.service;
 
-import com.github.kol.oss.compiler.constant.NumberConstant;
 import com.github.kol.oss.compiler.constant.OperatorValue;
 import com.github.kol.oss.compiler.constant.TermSign;
 import com.github.kol.oss.compiler.dto.chain.Chain;
 import com.github.kol.oss.compiler.dto.chain.Term;
-import com.github.kol.oss.compiler.dto.change.Transformation;
-import com.github.kol.oss.compiler.dto.change.TransformationResult;
-import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
+import com.github.kol.oss.compiler.pipeline.Pass;
+import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
+import com.github.kol.oss.compiler.utils.ArithmeticUtils;
 import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
 import com.github.kol.oss.compiler.utils.ChainAssembler;
-import com.github.kol.oss.compiler.utils.NodeFactory;
-import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-public class CommutativeService {
-    public TransformationResult applyCommutativeLaw(TokenNode root) {
-        Map<TokenNode, TokenNode> replacements = new IdentityHashMap<>();
-        List<Transformation> applied = new ArrayList<>();
-        Set<TokenNode> chainRoots = Collections.newSetFromMap(new IdentityHashMap<>());
-        chainRoots.addAll(TreeWalker.collectChainRoots(root, false));
-
-        for (TokenNode node : TreeWalker.postOrder(root)) {
-            if (node instanceof ValueNode)
-                continue;
-
-            if (node instanceof FunctionNode function) {
-                commuteFunction(function, replacements);
-                continue;
-            }
-
-            OperationNode operation = (OperationNode) node;
-
-            if (TreeWalker.chainFamily(node) != null) {
-                if (!chainRoots.contains(node))
-                    continue;
-
-                commuteChain(operation, replacements, applied);
-                continue;
-            }
-
-            TokenNode left = TreeWalker.resolve(operation.getLeft(), replacements);
-            TokenNode right = TreeWalker.resolve(operation.getRight(), replacements);
-
-            if (left != operation.getLeft() || right != operation.getRight())
-                replacements.put(operation, NodeFactory.operation(operation.getToken(), left, right));
-        }
-
-        return new TransformationResult(TreeWalker.resolve(root, replacements), applied);
+public class CommutativeService extends TreeRewritePass {
+    @Override
+    public String name() {
+        return Pass.COMMUTATIVE;
     }
 
-    private void commuteFunction(FunctionNode function, Map<TokenNode, TokenNode> replacements) {
-        List<TokenNode> arguments = function.getArguments().stream()
-                .map(argument -> TreeWalker.resolve(argument, replacements))
-                .toList();
-
-        if (!arguments.equals(function.getArguments()))
-            replacements.put(function, NodeFactory.function(function.getToken(), arguments));
-    }
-
-    private void commuteChain(OperationNode operation, Map<TokenNode, TokenNode> replacements, List<Transformation> applied) {
-        Chain chain = ChainAssembler.assemble(operation, replacements);
+    @Override
+    protected void rewriteChain(OperationNode operation, Context context) {
+        Chain chain = ChainAssembler.assemble(operation, context.replacements());
         List<Term> terms = chain.family() == OperatorValue.PLUS ? dropZeros(chain.terms()) : chain.terms();
 
         List<Term> positives = filter(terms, TermSign.POSITIVE);
@@ -84,10 +39,10 @@ public class CommutativeService {
         reordered.addAll(sortedNegatives);
 
         TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), reordered));
-        replacements.put(operation, rebuilt);
+        context.replace(operation, rebuilt);
 
         if (orderChanged)
-            applied.add(new Transformation(operation, rebuilt));
+            context.record(operation, rebuilt);
     }
 
     private List<Term> filter(List<Term> terms, TermSign sign) {
@@ -120,6 +75,6 @@ public class CommutativeService {
     }
 
     private boolean isZero(TokenNode node) {
-        return node instanceof ValueNode && node.getToken().value().equals(NumberConstant.ZERO);
+        return node instanceof ValueNode value && ArithmeticUtils.isZero(value.getToken());
     }
 }

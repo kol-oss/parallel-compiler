@@ -6,16 +6,14 @@ import com.github.kol.oss.compiler.constant.TermSign;
 import com.github.kol.oss.compiler.constant.TokenType;
 import com.github.kol.oss.compiler.dto.chain.Chain;
 import com.github.kol.oss.compiler.dto.chain.Term;
-import com.github.kol.oss.compiler.dto.change.Transformation;
-import com.github.kol.oss.compiler.dto.change.TransformationResult;
-import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.exception.ZeroDivisionException;
+import com.github.kol.oss.compiler.pipeline.Pass;
+import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
 import com.github.kol.oss.compiler.utils.ArithmeticUtils;
 import com.github.kol.oss.compiler.utils.ChainAssembler;
 import com.github.kol.oss.compiler.utils.NodeFactory;
@@ -23,75 +21,31 @@ import com.github.kol.oss.compiler.utils.TokenMapper;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
-public class OptimizationService {
-    private final ExceptionHandler exceptionHandler;
-
-    public OptimizationService(ExceptionHandler exceptionHandler) {
-        this.exceptionHandler = exceptionHandler;
+public class OptimizationService extends TreeRewritePass {
+    @Override
+    public String name() {
+        return Pass.OPTIMIZATIONS;
     }
 
-    public TransformationResult optimize(TokenNode root) {
-        Map<TokenNode, TokenNode> replacements = new IdentityHashMap<>();
-        List<Transformation> applied = new ArrayList<>();
-        Set<TokenNode> chainRoots = Collections.newSetFromMap(new IdentityHashMap<>());
-        chainRoots.addAll(TreeWalker.collectChainRoots(root, false));
-
-        for (TokenNode node : TreeWalker.postOrder(root)) {
-            if (node instanceof ValueNode)
-                continue;
-
-            if (node instanceof FunctionNode function) {
-                optimizeFunction(function, replacements);
-                continue;
-            }
-
-            OperationNode operation = (OperationNode) node;
-
-            if (TreeWalker.chainFamily(node) != null) {
-                if (!chainRoots.contains(node))
-                    continue;
-
-                optimizeChain(operation, replacements, applied);
-                continue;
-            }
-
-            optimizeOperation(operation, replacements, applied);
-        }
-
-        return new TransformationResult(TreeWalker.resolve(root, replacements), applied);
-    }
-
-    private void optimizeFunction(FunctionNode function, Map<TokenNode, TokenNode> replacements) {
-        List<TokenNode> arguments = function.getArguments().stream()
-                .map(argument -> TreeWalker.resolve(argument, replacements))
-                .toList();
-
-        if (!arguments.equals(function.getArguments()))
-            replacements.put(function, NodeFactory.function(function.getToken(), arguments));
-    }
-
-    private void optimizeChain(OperationNode operation, Map<TokenNode, TokenNode> replacements, List<Transformation> applied) {
-        Chain chain = ChainAssembler.assemble(operation, replacements);
+    @Override
+    protected void rewriteChain(OperationNode operation, Context context) {
+        Chain chain = ChainAssembler.assemble(operation, context.replacements());
         List<Term> terms = chain.terms();
         boolean sum = chain.family() == OperatorValue.PLUS;
 
         if (!sum && hasDivisorZero(terms)) {
-            reportDivisorZero(terms);
-            replacements.put(operation, rebuild(chain.family(), terms));
+            reportDivisorZero(terms, context);
+            context.replace(operation, rebuild(chain.family(), terms));
             return;
         }
 
         if (!sum && hasZeroNumerator(terms)) {
             TokenNode zero = zeroValue(terms);
-            replacements.put(operation, zero);
-            applied.add(new Transformation(operation, zero));
+            context.replace(operation, zero);
+            context.record(operation, zero);
             return;
         }
 
@@ -103,8 +57,8 @@ public class OptimizationService {
 
             if (reduced.isEmpty()) {
                 TokenNode collapsed = sum ? cancelValue(terms) : oneValue(terms);
-                replacements.put(operation, collapsed);
-                applied.add(new Transformation(operation, collapsed));
+                context.replace(operation, collapsed);
+                context.record(operation, collapsed);
                 return;
             }
 
@@ -114,7 +68,7 @@ public class OptimizationService {
         List<Term> constants = new ArrayList<>();
         List<Term> others = new ArrayList<>();
         for (Term term : terms) {
-            if (term.node() instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken()))
+            if (isNumericValue(term.node()))
                 constants.add(term);
             else
                 others.add(term);
@@ -122,10 +76,10 @@ public class OptimizationService {
 
         if (constants.isEmpty()) {
             TokenNode rebuilt = rebuild(chain.family(), terms);
-            replacements.put(operation, rebuilt);
+            context.replace(operation, rebuilt);
 
             if (cancelled)
-                applied.add(new Transformation(operation, rebuilt));
+                context.record(operation, rebuilt);
 
             return;
         }
@@ -134,8 +88,8 @@ public class OptimizationService {
 
         if (others.isEmpty()) {
             TokenNode value = NodeFactory.value(folded);
-            replacements.put(operation, value);
-            applied.add(new Transformation(operation, value));
+            context.replace(operation, value);
+            context.record(operation, value);
             return;
         }
 
@@ -143,10 +97,10 @@ public class OptimizationService {
 
         if (constants.size() == 1 && !safeDrop) {
             TokenNode rebuilt = rebuild(chain.family(), terms);
-            replacements.put(operation, rebuilt);
+            context.replace(operation, rebuilt);
 
             if (cancelled)
-                applied.add(new Transformation(operation, rebuilt));
+                context.record(operation, rebuilt);
 
             return;
         }
@@ -154,8 +108,35 @@ public class OptimizationService {
         List<Term> optimized = safeDrop ? others : replaceFirstConstant(terms, folded, sum);
         TokenNode rebuilt = rebuild(chain.family(), optimized);
 
-        replacements.put(operation, rebuilt);
-        applied.add(new Transformation(operation, rebuilt));
+        context.replace(operation, rebuilt);
+        context.record(operation, rebuilt);
+    }
+
+    @Override
+    protected void rewriteOperation(OperationNode operation, Context context) {
+        TokenNode left = TreeWalker.resolve(operation.getLeft(), context.replacements());
+        TokenNode right = TreeWalker.resolve(operation.getRight(), context.replacements());
+        OperatorValue operator = TokenMapper.tokenToOperator(operation.getToken());
+
+        if (right instanceof ValueNode rightValue && isZero(rightValue) && ArithmeticUtils.isDivisionLike(operator)) {
+            reportDivisorZero(rightValue, context);
+        } else if (left instanceof ValueNode leftValue && right instanceof ValueNode rightValue) {
+            Optional<Token> folded = ArithmeticUtils.applyOperation(
+                    leftValue.getToken(),
+                    rightValue.getToken(),
+                    operator
+            );
+
+            if (folded.isPresent()) {
+                TokenNode value = NodeFactory.value(folded.get());
+                context.replace(operation, value);
+                context.record(operation, value);
+                return;
+            }
+        }
+
+        if (left != operation.getLeft() || right != operation.getRight())
+            context.replace(operation, NodeFactory.operation(operation.getToken(), left, right));
     }
 
     private List<Term> cancelOpposites(List<Term> terms) {
@@ -192,7 +173,7 @@ public class OptimizationService {
 
     private TokenNode zeroValue(List<Term> terms) {
         Token token = terms.stream()
-                .filter(term -> isLiteral(term.node(), NumberConstant.ZERO))
+                .filter(term -> isZero(term.node()))
                 .map(term -> term.node().getToken())
                 .findFirst()
                 .orElseGet(this::zeroToken);
@@ -215,15 +196,13 @@ public class OptimizationService {
         boolean inserted = false;
 
         for (Term term : terms) {
-            boolean constant = term.node() instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken());
-
-            if (constant && !inserted) {
+            if (isNumericValue(term.node()) && !inserted) {
                 inserted = true;
                 result.add(foldedTerm(folded, sum));
                 continue;
             }
 
-            if (!constant)
+            if (!isNumericValue(term.node()))
                 result.add(term);
         }
 
@@ -262,33 +241,45 @@ public class OptimizationService {
     private boolean hasDivisorZero(List<Term> terms) {
         return terms.stream()
                 .filter(term -> term.sign() == TermSign.NEGATIVE)
-                .anyMatch(term -> isLiteral(term.node(), NumberConstant.ZERO));
+                .anyMatch(term -> isZero(term.node()));
     }
 
     private boolean hasZeroNumerator(List<Term> terms) {
         return terms.stream()
                 .filter(term -> term.sign() == TermSign.POSITIVE)
-                .anyMatch(term -> isLiteral(term.node(), NumberConstant.ZERO));
+                .anyMatch(term -> isZero(term.node()));
     }
 
-    private void reportDivisorZero(List<Term> terms) {
+    private void reportDivisorZero(List<Term> terms, Context context) {
         for (Term term : terms) {
-            if (term.sign() != TermSign.NEGATIVE || !isLiteral(term.node(), NumberConstant.ZERO))
+            if (term.sign() != TermSign.NEGATIVE || !isZero(term.node()))
                 continue;
 
-            PositionedException exception = new ZeroDivisionException();
-            exception.setIndex(term.node().getToken().position());
-            exceptionHandler.add(exception);
+            reportDivisorZero(term.node(), context);
             return;
         }
     }
 
-    private boolean isLiteral(TokenNode node, String literal) {
-        return node instanceof ValueNode && node.getToken().value().equals(literal);
+    private void reportDivisorZero(TokenNode node, Context context) {
+        PositionedException exception = new ZeroDivisionException();
+        exception.setIndex(node.getToken().position());
+        context.report(exception);
+    }
+
+    private boolean isNumericValue(TokenNode node) {
+        return node instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken());
+    }
+
+    private boolean isZero(TokenNode node) {
+        return node instanceof ValueNode value && ArithmeticUtils.isZero(value.getToken());
+    }
+
+    private boolean isZero(ValueNode node) {
+        return ArithmeticUtils.isZero(node.getToken());
     }
 
     private boolean isNeutral(Token folded, boolean sum) {
-        return folded.value().equals(sum ? NumberConstant.ZERO : NumberConstant.ONE);
+        return sum ? ArithmeticUtils.isZero(folded) : ArithmeticUtils.isOne(folded);
     }
 
     private TokenNode rebuild(OperatorValue family, List<Term> terms) {
@@ -317,29 +308,6 @@ public class OptimizationService {
             return positive ? OperatorValue.PLUS : OperatorValue.MINUS;
 
         return positive ? OperatorValue.MULTIPLY : OperatorValue.DIVISION;
-    }
-
-    private void optimizeOperation(OperationNode operation, Map<TokenNode, TokenNode> replacements, List<Transformation> applied) {
-        TokenNode left = TreeWalker.resolve(operation.getLeft(), replacements);
-        TokenNode right = TreeWalker.resolve(operation.getRight(), replacements);
-
-        if (left instanceof ValueNode leftValue && right instanceof ValueNode rightValue) {
-            Optional<Token> folded = ArithmeticUtils.applyOperation(
-                    leftValue.getToken(),
-                    rightValue.getToken(),
-                    TokenMapper.tokenToOperator(operation.getToken())
-            );
-
-            if (folded.isPresent()) {
-                TokenNode value = NodeFactory.value(folded.get());
-                replacements.put(operation, value);
-                applied.add(new Transformation(operation, value));
-                return;
-            }
-        }
-
-        if (left != operation.getLeft() || right != operation.getRight())
-            replacements.put(operation, NodeFactory.operation(operation.getToken(), left, right));
     }
 
     private Token zeroToken() {

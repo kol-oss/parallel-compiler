@@ -1,7 +1,6 @@
 package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -14,8 +13,6 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SyntaxValidationServiceTest {
-    private ExceptionHandler exceptionHandler;
-
     private LexicalAnalysisService lexicalAnalysisService;
     private SyntaxValidationService syntaxValidationService;
 
@@ -33,7 +30,10 @@ public class SyntaxValidationServiceTest {
                 Arguments.of("1+2*3/(4-5)^6"),
                 Arguments.of("a+-b"),
                 Arguments.of("-(-a)"),
-                Arguments.of("2.3*4.5")
+                Arguments.of("2.3*4.5"),
+                Arguments.of("a&b"),
+                Arguments.of("a|b"),
+                Arguments.of("5&3")
         );
     }
 
@@ -48,25 +48,26 @@ public class SyntaxValidationServiceTest {
                 Arguments.of("f(a,)", 1, 4),
                 Arguments.of("f(,a)", 1, 2),
                 Arguments.of("8(a)", 1, 1),
-                Arguments.of("a**b", 1, 2)
+                Arguments.of("a**b", 1, 2),
+                Arguments.of("2x", 1, 1),
+                Arguments.of("2sin(x)", 1, 1),
+                Arguments.of("1e5", 1, 1),
+                Arguments.of("a&+b", 1, 2)
         );
     }
 
     @BeforeEach
     public void setUp() {
-        exceptionHandler = new ExceptionHandler();
-
-        lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
-        syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+        lexicalAnalysisService = new LexicalAnalysisService();
+        syntaxValidationService = new SyntaxValidationService();
     }
 
     @ParameterizedTest
     @MethodSource("provideCorrectExpressionCases")
     public void givenCorrectExpression_whenValidate_thenNoErrors(String expression) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
-        syntaxValidationService.validate(tokens);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
 
-        List<PositionedException> errors = exceptionHandler.getAllAndClear();
+        List<PositionedException> errors = syntaxValidationService.validate(tokens);
 
         assertTrue(errors.isEmpty());
     }
@@ -74,10 +75,9 @@ public class SyntaxValidationServiceTest {
     @ParameterizedTest
     @MethodSource("provideIncorrectExpressionCases")
     public void givenIncorrectExpression_whenValidate_thenErrorsDetected(String expression, int expectedErrorCount, int expectedFirstErrorPosition) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
-        syntaxValidationService.validate(tokens);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
 
-        List<PositionedException> errors = exceptionHandler.getAllAndClear();
+        List<PositionedException> errors = syntaxValidationService.validate(tokens);
 
         assertFalse(errors.isEmpty());
         assertEquals(expectedErrorCount, errors.size());

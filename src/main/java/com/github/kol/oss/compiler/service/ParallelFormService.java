@@ -1,68 +1,39 @@
 package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.constant.OperatorValue;
-import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
-import com.github.kol.oss.compiler.dto.node.ValueNode;
+import com.github.kol.oss.compiler.pipeline.Pass;
+import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
 import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
 import com.github.kol.oss.compiler.utils.NodeFactory;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-public class ParallelFormService {
+public class ParallelFormService extends TreeRewritePass {
     private record Frame(TokenNode node, boolean term) {
     }
 
-    public TokenNode buildParallelTree(TokenNode root) {
-        Map<TokenNode, TokenNode> replacements = new IdentityHashMap<>();
-        Set<TokenNode> chainRoots = Collections.newSetFromMap(new IdentityHashMap<>());
-        chainRoots.addAll(TreeWalker.collectChainRoots(root, true));
-
-        for (TokenNode node : TreeWalker.postOrder(root)) {
-            if (node instanceof ValueNode)
-                continue;
-
-            if (node instanceof FunctionNode function) {
-                List<TokenNode> arguments = function.getArguments().stream()
-                        .map(argument -> TreeWalker.resolve(argument, replacements))
-                        .toList();
-
-                if (!arguments.equals(function.getArguments()))
-                    replacements.put(function, NodeFactory.function(function.getToken(), arguments));
-
-                continue;
-            }
-
-            OperationNode operation = (OperationNode) node;
-
-            if (TreeWalker.chainFamily(node) != null) {
-                if (!chainRoots.contains(node))
-                    continue;
-
-                replacements.put(node, rebuildChain(operation, flatten(operation, replacements)));
-                continue;
-            }
-
-            TokenNode left = TreeWalker.resolve(operation.getLeft(), replacements);
-            TokenNode right = TreeWalker.resolve(operation.getRight(), replacements);
-
-            if (left != operation.getLeft() || right != operation.getRight())
-                replacements.put(operation, NodeFactory.operation(operation.getToken(), left, right));
-        }
-
-        return TreeWalker.resolve(root, replacements);
+    @Override
+    public String name() {
+        return Pass.PARALLEL;
     }
 
-    private List<TokenNode> flatten(OperationNode chainRoot, Map<TokenNode, TokenNode> replacements) {
+    @Override
+    protected boolean strictChains() {
+        return true;
+    }
+
+    @Override
+    protected void rewriteChain(OperationNode operation, Context context) {
+        context.replace(operation, rebuildChain(operation, flatten(operation, context)));
+    }
+
+    private List<TokenNode> flatten(OperationNode chainRoot, Context context) {
         String operator = chainRoot.getToken().value();
         boolean flattenBoth = OperatorValue.fromSymbol(operator) == OperatorValue.PLUS
                 || OperatorValue.fromSymbol(operator) == OperatorValue.MULTIPLY;
@@ -73,7 +44,7 @@ public class ParallelFormService {
 
         while (!pending.isEmpty()) {
             Frame frame = pending.pop();
-            TokenNode node = TreeWalker.resolve(frame.node(), replacements);
+            TokenNode node = TreeWalker.resolve(frame.node(), context.replacements());
 
             if (!frame.term() && node instanceof OperationNode operation
                     && operation.getToken().value().equals(operator)) {

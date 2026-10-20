@@ -1,13 +1,16 @@
 package com.github.kol.oss.compiler;
 
-import com.github.kol.oss.compiler.dto.change.TransformationResult;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
-import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
+import com.github.kol.oss.compiler.dto.token.LexicalResult;
 import com.github.kol.oss.compiler.exception.PositionedException;
+import com.github.kol.oss.compiler.pipeline.CompilerPipeline;
+import com.github.kol.oss.compiler.pipeline.Pass;
+import com.github.kol.oss.compiler.pipeline.PassResult;
 import com.github.kol.oss.compiler.service.*;
 import com.github.kol.oss.compiler.view.ConsoleView;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public class Main {
@@ -16,22 +19,23 @@ public class Main {
 
     public static void main(String[] args) {
         ConsoleView view = new ConsoleView();
-        ExceptionHandler exceptionHandler = new ExceptionHandler();
 
-        LexicalAnalysisService lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
-        SyntaxValidationService syntaxValidationService = new SyntaxValidationService(exceptionHandler);
-
+        LexicalAnalysisService lexicalAnalysisService = new LexicalAnalysisService();
+        SyntaxValidationService syntaxValidationService = new SyntaxValidationService();
         TreeBuildService treeBuildService = new TreeBuildService();
-        OptimizationService optimizationService = new OptimizationService(exceptionHandler);
-
-        CommutativeService commutativeService = new CommutativeService();
-        AssociativeService associativeService = new AssociativeService();
-        ParallelFormService parallelFormService = new ParallelFormService();
         EvaluationService evaluationService = new EvaluationService();
+
+        CompilerPipeline pipeline = new CompilerPipeline(List.of(
+                new OptimizationService(),
+                new CommutativeService(),
+                new AssociativeService(),
+                new ParallelFormService()
+        ));
 
         boolean isTokenOutput = false;
 
-        while (true) {
+        view.printInputLine();
+        while (view.hasNextLine()) {
             String value = view.readLine();
             if (value.equalsIgnoreCase(END_COMMAND))
                 break;
@@ -44,56 +48,57 @@ public class Main {
             if (value.isEmpty())
                 continue;
 
-            // Lexical and syntax validations
-            List<Token> tokens = lexicalAnalysisService.tokenize(value);
-            if (isTokenOutput)
-                view.printTokens(tokens);
+            try {
+                LexicalResult lexical = lexicalAnalysisService.tokenize(value);
+                if (isTokenOutput)
+                    view.printTokens(lexical.tokens());
 
-            syntaxValidationService.validate(tokens);
-            if (failed(view, exceptionHandler, value))
-                continue;
+                List<PositionedException> errors = collectErrors(lexical, syntaxValidationService);
+                if (!errors.isEmpty()) {
+                    view.printErrors(value, errors);
+                    continue;
+                }
 
-            // General optimizations
-            TransformationResult optimized = optimizationService.optimize(treeBuildService.buildTree(tokens));
-            view.printOptimizations(optimized.applied());
+                if (lexical.tokens().isEmpty())
+                    continue;
 
-            if (failed(view, exceptionHandler, value))
-                continue;
+                TokenNode tree = treeBuildService.buildTree(lexical.tokens());
 
-            // Commutative optimizations
-            TransformationResult commuted = commutativeService.applyCommutativeLaw(optimized.tree());
-            view.printCommutativeTransformations(commuted.applied());
+                for (PassResult pass : pipeline.run(tree)) {
+                    if (!pass.diagnostics().isEmpty()) {
+                        view.printErrors(value, pass.diagnostics());
+                        break;
+                    }
 
-            if (failed(view, exceptionHandler, value))
-                continue;
-
-            view.printEquivalentForm(commuted.tree());
-
-            // Associative optimizations
-            TransformationResult associated = associativeService.applyAssociativeLaw(commuted.tree());
-            view.printAssociativeTransformations(associated.applied());
-
-            if (failed(view, exceptionHandler, value))
-                continue;
-
-            view.printEquivalentForm(associated.tree());
-
-            // Parallel optimizations
-            TokenNode operatorTree = parallelFormService.buildParallelTree(associated.tree());
-            if (failed(view, exceptionHandler, value))
-                continue;
-
-            evaluationService.evaluate(operatorTree).ifPresent(view::printResult);
-            view.printTree(operatorTree);
+                    switch (pass.name()) {
+                        case Pass.OPTIMIZATIONS -> view.printOptimizations(pass.applied());
+                        case Pass.COMMUTATIVE -> {
+                            view.printCommutativeTransformations(pass.applied());
+                            view.printEquivalentForm(pass.tree());
+                        }
+                        case Pass.ASSOCIATIVE -> {
+                            view.printAssociativeTransformations(pass.applied());
+                            view.printEquivalentForm(pass.tree());
+                        }
+                        case Pass.PARALLEL -> {
+                            evaluationService.evaluate(pass.tree()).ifPresent(view::printResult);
+                            view.printTree(pass.tree());
+                        }
+                    }
+                }
+            } catch (RuntimeException exception) {
+                view.printFailure(value, exception);
+            } finally {
+                view.printInputLine();
+            }
         }
     }
 
-    private static boolean failed(ConsoleView view, ExceptionHandler exceptionHandler, String expression) {
-        List<PositionedException> errors = exceptionHandler.getAllAndClear();
-        if (errors.isEmpty())
-            return false;
+    private static List<PositionedException> collectErrors(LexicalResult lexical, SyntaxValidationService syntaxValidationService) {
+        List<PositionedException> errors = new ArrayList<>(lexical.diagnostics());
+        errors.addAll(syntaxValidationService.validate(lexical.tokens()));
 
-        view.printErrors(expression, errors);
-        return true;
+        errors.sort(Comparator.comparingInt(PositionedException::getIndex));
+        return errors;
     }
 }

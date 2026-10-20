@@ -6,7 +6,6 @@ import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.exception.ExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -18,8 +17,6 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TreeBuildServiceTest {
-    private ExceptionHandler exceptionHandler;
-
     private LexicalAnalysisService lexicalAnalysisService;
     private SyntaxValidationService syntaxValidationService;
 
@@ -59,10 +56,8 @@ public class TreeBuildServiceTest {
 
     @BeforeEach
     public void setUp() {
-        exceptionHandler = new ExceptionHandler();
-
-        lexicalAnalysisService = new LexicalAnalysisService(exceptionHandler);
-        syntaxValidationService = new SyntaxValidationService(exceptionHandler);
+        lexicalAnalysisService = new LexicalAnalysisService();
+        syntaxValidationService = new SyntaxValidationService();
 
         treeBuildService = new TreeBuildService();
     }
@@ -70,7 +65,7 @@ public class TreeBuildServiceTest {
     @ParameterizedTest
     @MethodSource("provideOperatorCases")
     public void givenSimpleExpression_whenBuildTree_thenOperationNodeWithExpectedOperator(String expression, OperatorValue expectedRootOperator) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode root = treeBuildService.buildTree(tokens);
@@ -83,7 +78,7 @@ public class TreeBuildServiceTest {
     @ParameterizedTest
     @MethodSource("provideStructureCases")
     public void givenExpression_whenBuildTree_thenRootAndChildrenMatch(String expression, String expectedRootSymbol, int expectedChildrenCount) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode root = treeBuildService.buildTree(tokens);
@@ -104,7 +99,7 @@ public class TreeBuildServiceTest {
     @ParameterizedTest
     @MethodSource("provideLeafCases")
     public void givenLeafExpression_whenBuildTree_thenValueNode(String expression, String expectedValue) {
-        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode root = treeBuildService.buildTree(tokens);
