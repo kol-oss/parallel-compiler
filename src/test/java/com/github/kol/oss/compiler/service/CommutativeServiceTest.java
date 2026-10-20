@@ -50,6 +50,13 @@ public class CommutativeServiceTest {
         );
     }
 
+    private static Stream<Arguments> provideCancelledTermsCases() {
+        return Stream.of(
+                Arguments.of("a + x - x + b*c", "((b*c)+a)"),
+                Arguments.of("a - b + b - c*d", "(a-(c*d))")
+        );
+    }
+
     @BeforeEach
     public void setUp() {
         exceptionHandler = new ExceptionHandler();
@@ -97,6 +104,22 @@ public class CommutativeServiceTest {
     @ParameterizedTest
     @MethodSource("providePositivesAndNegativesSeparatedCases")
     public void givenSignedChain_whenApplyCommutative_thenPositivesAndNegativesSeparated(String expression, String expectedExpressionFormKey) {
+        List<Token> tokens = lexicalAnalysisService.tokenize(expression);
+        syntaxValidationService.validate(tokens);
+
+        TokenNode tree = treeBuildService.buildTree(tokens);
+        TransformationResult optimized = optimizationService.optimize(tree);
+        TransformationResult result = commutativeService.applyCommutativeLaw(optimized.tree());
+
+        TokenNode commuted = result.tree();
+
+        assertNotNull(commuted);
+        assertEquals(expectedExpressionFormKey, toKey(commuted));
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideCancelledTermsCases")
+    public void givenSumWithCancelledTerms_whenApplyCommutative_thenRemainingTermsReordered(String expression, String expectedExpressionFormKey) {
         List<Token> tokens = lexicalAnalysisService.tokenize(expression);
         syntaxValidationService.validate(tokens);
 

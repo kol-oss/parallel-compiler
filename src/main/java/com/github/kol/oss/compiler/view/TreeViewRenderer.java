@@ -4,42 +4,10 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
 public class TreeViewRenderer {
-    public String renderByLevels(TokenNode root) {
-        if (root == null)
-            return "";
-
-        Deque<TokenNode> queue = new ArrayDeque<>();
-        queue.add(root);
-
-        List<String> lines = new ArrayList<>();
-        int level = 0;
-
-        while (!queue.isEmpty()) {
-            int levelSize = queue.size();
-            StringBuilder line = new StringBuilder("Level ").append(level).append(": ");
-
-            for (int i = 0; i < levelSize; i++) {
-                TokenNode node = queue.poll();
-
-                if (i > 0)
-                    line.append(" | ");
-
-                line.append(node.getToken().value());
-                queue.addAll(TreeWalker.children(node));
-            }
-
-            lines.add(line.toString());
-            level++;
-        }
-
-        return String.join("\n", lines);
-    }
-
     public String renderStructure(TokenNode root) {
         if (root == null)
             return "";

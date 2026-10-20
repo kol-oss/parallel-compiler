@@ -69,10 +69,6 @@ public class ConsoleView {
     }
 
     public void printTree(TokenNode tree) {
-        System.out.println("Parallel tree (by levels):");
-        System.out.println(treeRenderer.renderByLevels(tree));
-        System.out.println();
-
         System.out.println("Parallel tree (structure):");
         System.out.print(treeRenderer.renderStructure(tree));
         System.out.println();
