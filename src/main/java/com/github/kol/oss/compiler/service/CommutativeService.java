@@ -26,18 +26,24 @@ public class CommutativeService extends TreeRewritePass {
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
         Chain chain = ChainAssembler.assemble(operation, context.replacements());
+        // drop zeros for sum
         List<Term> terms = chain.family() == OperatorValue.PLUS ? dropZeros(chain.terms()) : chain.terms();
 
+        // split by sign
         List<Term> positives = filter(terms, TermSign.POSITIVE);
         List<Term> negatives = filter(terms, TermSign.NEGATIVE);
+
+        // sort by weight
         List<Term> sortedPositives = sortedByWeight(positives);
         List<Term> sortedNegatives = sortedByWeight(negatives);
 
+        // check order change
         boolean orderChanged = !sameOrder(positives, sortedPositives) || !sameOrder(negatives, sortedNegatives);
 
         List<Term> reordered = new ArrayList<>(sortedPositives);
         reordered.addAll(sortedNegatives);
 
+        // rebuild
         TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), reordered));
         context.replace(operation, rebuilt);
 
@@ -45,10 +51,12 @@ public class CommutativeService extends TreeRewritePass {
             context.record(operation, rebuilt);
     }
 
+    // filter by sign
     private List<Term> filter(List<Term> terms, TermSign sign) {
         return terms.stream().filter(term -> term.sign() == sign).toList();
     }
 
+    // sort by weight desc
     private List<Term> sortedByWeight(List<Term> terms) {
         return terms.stream()
                 .sorted(Comparator.comparingInt((Term term) -> term.node().getWeight()).reversed())

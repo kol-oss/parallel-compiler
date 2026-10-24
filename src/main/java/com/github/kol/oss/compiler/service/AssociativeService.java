@@ -13,40 +13,13 @@ import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.pipeline.Pass;
 import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
-import com.github.kol.oss.compiler.utils.ArithmeticUtils;
-import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
-import com.github.kol.oss.compiler.utils.ChainAssembler;
-import com.github.kol.oss.compiler.utils.NodeFactory;
-import com.github.kol.oss.compiler.utils.TreeWalker;
+import com.github.kol.oss.compiler.utils.*;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.*;
 
 public class AssociativeService extends TreeRewritePass {
     private static final int SEARCH_BUDGET = 200_000;
-
-    private record Factor(TokenNode node, TermSign sign, String norm, String flip) {
-    }
-
-    private record Grouping(List<Integer> indexes, Factor factor) {
-    }
-
-    private record Keys(String norm, String flip) {
-    }
-
-    private static final class SearchContext {
-        private final Map<String, List<Term>> memo = new HashMap<>();
-        private final Map<TokenNode, Keys> keys = new WeakHashMap<>();
-        private final Map<TokenNode, List<Factor>> factors = new WeakHashMap<>();
-        private int budget = SEARCH_BUDGET;
-    }
 
     @Override
     public String name() {
@@ -61,8 +34,8 @@ public class AssociativeService extends TreeRewritePass {
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
         SearchContext search = new SearchContext();
-
         Chain chain = ChainAssembler.assemble(operation, context.replacements());
+
         List<Term> grouped = groupFactors(chain.terms(), search);
         TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), grouped));
 
@@ -72,6 +45,7 @@ public class AssociativeService extends TreeRewritePass {
             context.record(operation, rebuilt);
     }
 
+    // find best grouping
     private List<Term> groupFactors(List<Term> terms, SearchContext search) {
         String state = signature(terms, search);
         List<Term> cached = search.memo.get(state);
@@ -85,6 +59,7 @@ public class AssociativeService extends TreeRewritePass {
         List<Term> best = terms;
         int bestCost = cost(terms);
 
+        // try groupings
         for (Grouping grouping : options(terms, search)) {
             List<Term> candidate = groupFactors(applyGrouping(terms, grouping, search), search);
             int candidateCost = cost(candidate);
@@ -100,6 +75,7 @@ public class AssociativeService extends TreeRewritePass {
     }
 
     private List<Grouping> options(List<Term> terms, SearchContext search) {
+        // get factors per term
         List<List<Factor>> termFactors = new ArrayList<>();
         for (Term term : terms)
             termFactors.add(factorsOf(term.node(), search));
@@ -109,11 +85,12 @@ public class AssociativeService extends TreeRewritePass {
 
         for (List<Factor> factors : termFactors) {
             for (Factor candidate : factors) {
+                // skip seen
                 if (!seen.add(candidate.sign() + "|" + candidate.norm()))
                     continue;
 
+                // find matches
                 List<Integer> indexes = matchingIndexes(termFactors, candidate);
-
                 if (indexes.size() >= 2 && !allNeutral(terms, termFactors, indexes, candidate, search))
                     result.add(new Grouping(indexes, candidate));
             }
@@ -122,6 +99,7 @@ public class AssociativeService extends TreeRewritePass {
         return result;
     }
 
+    // find matching term indexes
     private List<Integer> matchingIndexes(List<List<Factor>> termFactors, Factor candidate) {
         List<Integer> indexes = new ArrayList<>();
 
@@ -133,6 +111,7 @@ public class AssociativeService extends TreeRewritePass {
         return indexes;
     }
 
+    // check if grouping is neutral
     private boolean allNeutral(List<Term> terms, List<List<Factor>> termFactors, List<Integer> indexes, Factor candidate, SearchContext search) {
         return indexes.stream().allMatch(index -> {
             Term remainder = remainderTerm(terms.get(index), termFactors.get(index), candidate);
@@ -142,16 +121,18 @@ public class AssociativeService extends TreeRewritePass {
 
     private List<Term> applyGrouping(List<Term> terms, Grouping grouping, SearchContext search) {
         List<Term> remainders = new ArrayList<>();
-
         for (int index : grouping.indexes())
             remainders.add(remainderTerm(terms.get(index), factorsOf(terms.get(index).node(), search), grouping.factor()));
 
+        // handle signs
         boolean allNegative = remainders.stream().allMatch(term -> term.sign() == TermSign.NEGATIVE);
         TermSign groupSign = allNegative ? TermSign.NEGATIVE : TermSign.POSITIVE;
         List<Term> inner = allNegative ? flipped(remainders) : remainders;
 
+        // factorize inner
         inner = groupFactors(inner, search);
 
+        // build group
         TokenNode innerSum = BalancedTreeBuilder.buildSigned(new Chain(OperatorValue.PLUS, inner));
         TokenNode groupNode = grouping.factor().sign() == TermSign.POSITIVE
                 ? NodeFactory.operation(OperatorValue.MULTIPLY, grouping.factor().node(), innerSum)
@@ -207,6 +188,7 @@ public class AssociativeService extends TreeRewritePass {
         return BalancedTreeBuilder.buildSigned(new Chain(OperatorValue.MULTIPLY, terms));
     }
 
+    // insert group into list
     private List<Term> insertGroup(List<Term> terms, List<Integer> indexes, Term group) {
         boolean[] consumed = new boolean[terms.size()];
         for (int index : indexes)
@@ -228,6 +210,7 @@ public class AssociativeService extends TreeRewritePass {
         return result;
     }
 
+    // flip all terms to positive
     private List<Term> flipped(List<Term> terms) {
         return terms.stream().map(term -> new Term(term.node(), TermSign.POSITIVE)).toList();
     }
@@ -240,6 +223,7 @@ public class AssociativeService extends TreeRewritePass {
         return sign == TermSign.POSITIVE ? TermSign.NEGATIVE : TermSign.POSITIVE;
     }
 
+    // get factors of node
     private List<Factor> factorsOf(TokenNode node, SearchContext search) {
         List<Factor> cached = search.factors.get(node);
         if (cached != null)
@@ -391,5 +375,21 @@ public class AssociativeService extends TreeRewritePass {
 
     private Token oneToken() {
         return new Token(NumberConstant.ONE, TokenType.INTEGER, 0);
+    }
+
+    private record Factor(TokenNode node, TermSign sign, String norm, String flip) {
+    }
+
+    private record Grouping(List<Integer> indexes, Factor factor) {
+    }
+
+    private record Keys(String norm, String flip) {
+    }
+
+    private static final class SearchContext {
+        private final Map<String, List<Term>> memo = new HashMap<>();
+        private final Map<TokenNode, Keys> keys = new WeakHashMap<>();
+        private final Map<TokenNode, List<Factor>> factors = new WeakHashMap<>();
+        private int budget = SEARCH_BUDGET;
     }
 }

@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class LexicalAnalysisService {
+    // convert expression into list of tokens
     public LexicalResult tokenize(String expression) {
         return new Lexer().run(expression);
     }
@@ -40,11 +41,13 @@ public class LexicalAnalysisService {
             if (tokenType == TokenType.SKIP)
                 return true;
 
+            // convert variable to function
             if (lastType == TokenType.VARIABLE && tokenType == TokenType.LPAREN) {
                 lastType = TokenType.FUNCTION;
                 return true;
             }
 
+            // merge integer and dot
             if (lastType == TokenType.INTEGER && tokenType == TokenType.FLOAT) {
                 lastType = TokenType.FLOAT;
                 return false;
@@ -99,6 +102,7 @@ public class LexicalAnalysisService {
             tokens = normalizeUnaryMinus(tokens);
         }
 
+        // normalize unary minus recursively
         private List<Token> normalizeUnaryMinus(List<Token> input) {
             List<Token> result = new ArrayList<>();
 
@@ -111,14 +115,17 @@ public class LexicalAnalysisService {
                     continue;
                 }
 
+                // find factor index
                 int factorEnd = findFactorEnd(input, i + 1);
                 List<Token> factor = normalizeUnaryMinus(input.subList(i + 1, factorEnd));
 
                 if (isLeadingPosition(previous)) {
+                    // add 0 - factor
                     result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
                     result.add(token);
                     result.addAll(factor);
                 } else {
+                    // add ( 0 - factor )
                     result.add(new Token(OperatorSymbol.LEFT_PARENTHESIS, TokenType.LPAREN, token.position()));
                     result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
                     result.add(token);

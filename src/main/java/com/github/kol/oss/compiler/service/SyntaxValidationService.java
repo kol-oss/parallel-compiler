@@ -36,11 +36,13 @@ public class SyntaxValidationService {
             }
 
             Token lastToken = tokens.getLast();
+            // check parens
             if (parenthesisCount > 0) {
                 InvalidParenthesisException exception = new InvalidParenthesisException(parenthesisCount);
                 processError(exception, lastToken);
             }
 
+            // check end
             checkTransition(new Token(lastToken.value(), TokenType.END, lastToken.position()));
             return diagnostics;
         }
@@ -74,6 +76,7 @@ public class SyntaxValidationService {
                 if (lastType == TokenType.FUNCTION)
                     functionParenthesisCount.add(parenthesisCount);
             } else if (nextType == TokenType.RPAREN) {
+                // check empty parens
                 if (lastType == TokenType.LPAREN && !functionParenthesisCount.contains(parenthesisCount)) {
                     InvalidContentException exception = new InvalidContentException();
                     processError(exception, token);

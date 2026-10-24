@@ -10,13 +10,10 @@ import com.github.kol.oss.compiler.utils.NodeFactory;
 import com.github.kol.oss.compiler.utils.TokenMapper;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public class EvaluationService {
+    // get numeric value if root folds to number
     public Optional<Token> evaluate(TokenNode root) {
         TokenNode foldedTree = fold(root);
         if (foldedTree instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken()))
@@ -24,6 +21,7 @@ public class EvaluationService {
         return Optional.empty();
     }
 
+    // fold constants in whole tree
     public TokenNode fold(TokenNode root) {
         Map<TokenNode, TokenNode> folded = new IdentityHashMap<>();
         for (TokenNode node : TreeWalker.postOrder(root)) {
@@ -31,23 +29,29 @@ public class EvaluationService {
                 continue;
             }
             if (node instanceof FunctionNode function) {
+                // fold function args
                 List<TokenNode> args = new ArrayList<>();
                 boolean changed = false;
+
                 for (TokenNode arg : function.getArguments()) {
                     TokenNode resolved = TreeWalker.resolve(arg, folded);
                     args.add(resolved);
-                    if (resolved != arg) {
+
+                    if (resolved != arg)
                         changed = true;
-                    }
                 }
-                if (changed) {
+
+                if (changed)
                     folded.put(function, NodeFactory.function(function.getToken(), args));
-                }
+
                 continue;
             }
             if (node instanceof OperationNode operation) {
+                // fold children
                 TokenNode left = TreeWalker.resolve(operation.getLeft(), folded);
                 TokenNode right = TreeWalker.resolve(operation.getRight(), folded);
+
+                // try to fold both values
                 if (left instanceof ValueNode leftValue && right instanceof ValueNode rightValue) {
                     Optional<Token> result = ArithmeticUtils.applyOperation(
                             leftValue.getToken(),
@@ -59,6 +63,8 @@ public class EvaluationService {
                         continue;
                     }
                 }
+
+                // propagate if changed
                 if (left != operation.getLeft() || right != operation.getRight()) {
                     folded.put(operation, NodeFactory.operation(operation.getToken(), left, right));
                 }

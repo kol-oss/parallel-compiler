@@ -15,9 +15,6 @@ import java.util.Deque;
 import java.util.List;
 
 public class ParallelFormService extends TreeRewritePass {
-    private record Frame(TokenNode node, boolean term) {
-    }
-
     @Override
     public String name() {
         return Pass.PARALLEL;
@@ -28,6 +25,7 @@ public class ParallelFormService extends TreeRewritePass {
         return true;
     }
 
+    // build parallel form
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
         context.replace(operation, rebuildChain(operation, flatten(operation, context)));
@@ -107,5 +105,8 @@ public class ParallelFormService extends TreeRewritePass {
         }
 
         return result;
+    }
+
+    private record Frame(TokenNode node, boolean term) {
     }
 }
