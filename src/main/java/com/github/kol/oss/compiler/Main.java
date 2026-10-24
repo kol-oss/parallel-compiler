@@ -64,25 +64,29 @@ public class Main {
 
                 TokenNode tree = treeBuildService.buildTree(lexical.tokens());
 
+                TokenNode currentTree;
                 for (PassResult pass : pipeline.run(tree)) {
                     if (!pass.diagnostics().isEmpty()) {
                         view.printErrors(value, pass.diagnostics());
                         break;
                     }
+                    currentTree = pass.tree();
 
                     switch (pass.name()) {
                         case Pass.OPTIMIZATIONS -> view.printOptimizations(pass.applied());
                         case Pass.COMMUTATIVE -> {
                             view.printCommutativeTransformations(pass.applied());
-                            view.printEquivalentForm(pass.tree());
+                            view.printEquivalentForm(currentTree);
                         }
                         case Pass.ASSOCIATIVE -> {
                             view.printAssociativeTransformations(pass.applied());
-                            view.printEquivalentForm(pass.tree());
+                            currentTree = evaluationService.fold(currentTree);
+                            view.printEquivalentForm(currentTree);
                         }
                         case Pass.PARALLEL -> {
-                            evaluationService.evaluate(pass.tree()).ifPresent(view::printResult);
-                            view.printTree(pass.tree());
+                            currentTree = evaluationService.fold(currentTree);
+                            evaluationService.evaluate(currentTree).ifPresent(view::printResult);
+                            view.printTree(currentTree);
                         }
                     }
                 }
