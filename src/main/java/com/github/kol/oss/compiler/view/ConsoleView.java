@@ -82,7 +82,7 @@ public class ConsoleView {
     }
 
     public void printTree(TokenNode tree) {
-        System.out.println("Parallel tree (structure):");
+        System.out.println("Final tree (structure):");
         System.out.print(treeRenderer.renderStructure(tree));
         System.out.println();
     }

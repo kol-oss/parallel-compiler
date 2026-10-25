@@ -12,6 +12,7 @@ import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
 import com.github.kol.oss.compiler.utils.ArithmeticUtils;
 import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
 import com.github.kol.oss.compiler.utils.ChainAssembler;
+import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,7 +48,7 @@ public class CommutativeService extends TreeRewritePass {
         TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), reordered));
         context.replace(operation, rebuilt);
 
-        if (orderChanged)
+        if (orderChanged || !TreeWalker.same(operation, rebuilt))
             context.record(operation, rebuilt);
     }
 

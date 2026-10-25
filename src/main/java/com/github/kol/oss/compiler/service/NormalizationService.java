@@ -1,19 +1,39 @@
 package com.github.kol.oss.compiler.service;
 
+import com.github.kol.oss.compiler.dto.chain.Chain;
 import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
+import com.github.kol.oss.compiler.pipeline.Pass;
+import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
 import com.github.kol.oss.compiler.utils.ArithmeticUtils;
+import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
+import com.github.kol.oss.compiler.utils.ChainAssembler;
 import com.github.kol.oss.compiler.utils.NodeFactory;
 import com.github.kol.oss.compiler.utils.TokenMapper;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.*;
 
-public class EvaluationService {
-    // get numeric value if root folds to number
+public class NormalizationService extends TreeRewritePass {
+    public static TokenNode normalize(TokenNode root) {
+        return new NormalizationService().apply(root).tree();
+    }
+
+    @Override
+    public String name() {
+        return Pass.NORMALIZATION;
+    }
+
+    @Override
+    protected void rewriteChain(OperationNode operation, Context context) {
+        Chain chain = ChainAssembler.assemble(operation, context.replacements());
+        TokenNode rebuilt = BalancedTreeBuilder.buildBalanced(chain);
+        context.replace(operation, rebuilt);
+    }
+
     public Optional<Token> evaluate(TokenNode root) {
         TokenNode foldedTree = fold(root);
         if (foldedTree instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken()))
@@ -21,7 +41,6 @@ public class EvaluationService {
         return Optional.empty();
     }
 
-    // fold constants in whole tree
     public TokenNode fold(TokenNode root) {
         Map<TokenNode, TokenNode> folded = new IdentityHashMap<>();
         for (TokenNode node : TreeWalker.postOrder(root)) {
@@ -29,7 +48,6 @@ public class EvaluationService {
                 continue;
             }
             if (node instanceof FunctionNode function) {
-                // fold function args
                 List<TokenNode> args = new ArrayList<>();
                 boolean changed = false;
 
@@ -47,11 +65,9 @@ public class EvaluationService {
                 continue;
             }
             if (node instanceof OperationNode operation) {
-                // fold children
                 TokenNode left = TreeWalker.resolve(operation.getLeft(), folded);
                 TokenNode right = TreeWalker.resolve(operation.getRight(), folded);
 
-                // try to fold both values
                 if (left instanceof ValueNode leftValue && right instanceof ValueNode rightValue) {
                     Optional<Token> result = ArithmeticUtils.applyOperation(
                             leftValue.getToken(),
@@ -64,7 +80,6 @@ public class EvaluationService {
                     }
                 }
 
-                // propagate if changed
                 if (left != operation.getLeft() || right != operation.getRight()) {
                     folded.put(operation, NodeFactory.operation(operation.getToken(), left, right));
                 }

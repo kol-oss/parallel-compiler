@@ -7,6 +7,7 @@ public interface Pass {
     String COMMUTATIVE = "commutative transformations";
     String ASSOCIATIVE = "associative transformations";
     String PARALLEL = "parallel transformations";
+    String NORMALIZATION = "normalization transformations";
 
     String name();
 

@@ -23,13 +23,14 @@ public class Main {
         LexicalAnalysisService lexicalAnalysisService = new LexicalAnalysisService();
         SyntaxValidationService syntaxValidationService = new SyntaxValidationService();
         TreeBuildService treeBuildService = new TreeBuildService();
-        EvaluationService evaluationService = new EvaluationService();
+        NormalizationService normalizationService = new NormalizationService();
 
         CompilerPipeline pipeline = new CompilerPipeline(List.of(
                 new OptimizationService(),
                 new CommutativeService(),
                 new AssociativeService(),
-                new ParallelFormService()
+                new ParallelFormService(),
+                normalizationService
         ));
 
         boolean isTokenOutput = false;
@@ -70,8 +71,8 @@ public class Main {
                         view.printErrors(value, pass.diagnostics());
                         break;
                     }
-                    currentTree = pass.tree();
 
+                    currentTree = pass.tree();
                     switch (pass.name()) {
                         case Pass.OPTIMIZATIONS -> view.printOptimizations(pass.applied());
                         case Pass.COMMUTATIVE -> {
@@ -80,12 +81,14 @@ public class Main {
                         }
                         case Pass.ASSOCIATIVE -> {
                             view.printAssociativeTransformations(pass.applied());
-                            currentTree = evaluationService.fold(currentTree);
+                            currentTree = normalizationService.fold(currentTree);
                             view.printEquivalentForm(currentTree);
                         }
-                        case Pass.PARALLEL -> {
-                            currentTree = evaluationService.fold(currentTree);
-                            evaluationService.evaluate(currentTree).ifPresent(view::printResult);
+                        case Pass.PARALLEL -> currentTree = normalizationService.fold(currentTree);
+                        case Pass.NORMALIZATION -> {
+                            currentTree = normalizationService.fold(currentTree);
+                            view.printEquivalentForm(currentTree);
+                            normalizationService.evaluate(currentTree).ifPresent(view::printResult);
                             view.printTree(currentTree);
                         }
                     }

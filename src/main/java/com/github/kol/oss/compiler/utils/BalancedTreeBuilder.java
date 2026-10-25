@@ -18,6 +18,25 @@ public class BalancedTreeBuilder {
     private record MergeTask(int start, int end, boolean combine) {
     }
 
+    private record SignedTask(int start, int end, TermSign multiplier, boolean combine, OperatorValue operator) {
+    }
+
+    public static TokenNode buildBalanced(Chain chain) {
+        TokenNode current = buildSigned(chain);
+        TokenNode balanced = buildBalancedSigned(chain);
+
+        if (balanced == null)
+            return current;
+
+        int currentHeight = TreeMetrics.height(current);
+        int balancedHeight = TreeMetrics.height(balanced);
+
+        if (balancedHeight != currentHeight)
+            return balancedHeight < currentHeight ? balanced : current;
+
+        return TreeMetrics.width(balanced) > TreeMetrics.width(current) ? balanced : current;
+    }
+
     public static TokenNode buildSigned(Chain chain) {
         List<TokenNode> positives = new ArrayList<>();
         List<TokenNode> negatives = new ArrayList<>();
@@ -78,6 +97,73 @@ public class BalancedTreeBuilder {
         }
 
         return merged.pop();
+    }
+
+    private static TokenNode buildBalancedSigned(Chain chain) {
+        List<Term> terms = chain.terms();
+
+        if (terms.isEmpty() || terms.getFirst().sign() != TermSign.POSITIVE)
+            return null;
+
+        if (terms.size() == 1)
+            return terms.getFirst().node();
+
+        boolean sum = chain.family() == OperatorValue.PLUS;
+        OperatorValue positive = sum ? OperatorValue.PLUS : OperatorValue.MULTIPLY;
+        OperatorValue negative = sum ? OperatorValue.MINUS : OperatorValue.DIVISION;
+
+        Deque<SignedTask> tasks = new ArrayDeque<>();
+        Deque<TokenNode> merged = new ArrayDeque<>();
+        tasks.push(new SignedTask(0, terms.size(), terms.getFirst().sign(), false, null));
+
+        while (!tasks.isEmpty()) {
+            SignedTask task = tasks.pop();
+
+            if (task.combine()) {
+                TokenNode right = merged.pop();
+                TokenNode left = merged.pop();
+                merged.push(NodeFactory.operation(task.operator(), left, right));
+                continue;
+            }
+
+            if (task.end() - task.start() == 1) {
+                merged.push(terms.get(task.start()).node());
+                continue;
+            }
+
+            int split = bestTermSplit(terms, task.start(), task.end());
+            OperatorValue operator = terms.get(split).sign() == task.multiplier() ? positive : negative;
+            tasks.push(new SignedTask(task.start(), task.end(), task.multiplier(), true, operator));
+            tasks.push(new SignedTask(split, task.end(), terms.get(split).sign(), false, null));
+            tasks.push(new SignedTask(task.start(), split, task.multiplier(), false, null));
+        }
+
+        return merged.pop();
+    }
+
+    private static int bestTermSplit(List<Term> terms, int start, int end) {
+        int total = 0;
+        for (int i = start; i < end; i++)
+            total += terms.get(i).node().getWeight();
+
+        int best = start + 1;
+        long bestDifference = Long.MAX_VALUE;
+        int prefix = 0;
+
+        for (int k = start + 1; k < end; k++) {
+            prefix += terms.get(k - 1).node().getWeight();
+
+            long left = prefix + (k - start - 1);
+            long right = (total - prefix) + (end - k - 1);
+            long difference = Math.abs(left - right);
+
+            if (difference < bestDifference) {
+                bestDifference = difference;
+                best = k;
+            }
+        }
+
+        return best;
     }
 
     private static int bestSplit(List<TokenNode> terms, int start, int end) {
