@@ -11,19 +11,19 @@ import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.pipeline.Pass;
-import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
+import com.github.kol.oss.compiler.pipeline.TransformationService;
+import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
 import com.github.kol.oss.compiler.utils.*;
 
 import java.math.BigDecimal;
 import java.util.*;
 
-public class AssociativeService extends TreeRewritePass {
+public class AssociativeService extends TreeTransformationService {
     private static final int SEARCH_BUDGET = 200_000;
 
     @Override
     public String name() {
-        return Pass.ASSOCIATIVE;
+        return TransformationService.ASSOCIATIVE;
     }
 
     @Override

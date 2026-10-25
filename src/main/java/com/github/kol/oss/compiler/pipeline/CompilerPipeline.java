@@ -8,18 +8,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CompilerPipeline {
-    private final List<Pass> passes;
+    private final List<TransformationService> services;
 
-    public CompilerPipeline(List<Pass> passes) {
-        this.passes = List.copyOf(passes);
+    public CompilerPipeline(List<TransformationService> services) {
+        this.services = List.copyOf(services);
     }
 
-    public List<PassResult> run(TokenNode tree) {
-        List<PassResult> results = new ArrayList<>();
+    public List<TransformationResult> run(TokenNode tree) {
+        List<TransformationResult> results = new ArrayList<>();
         TokenNode current = tree;
 
-        for (Pass pass : passes) {
-            PassResult result = pass.apply(current);
+        for (TransformationService service : services) {
+            TransformationResult result = service.apply(current);
 
             if (!result.diagnostics().isEmpty()) {
                 results.add(result);
@@ -30,7 +30,7 @@ public class CompilerPipeline {
             int candidateHeight = TreeMetrics.height(NormalizationService.normalize(result.tree()));
 
             if (candidateHeight > currentHeight) {
-                results.add(new PassResult(pass.name(), current, List.of(), List.of()));
+                results.add(new TransformationResult(service.name(), current, List.of(), List.of()));
                 continue;
             }
 

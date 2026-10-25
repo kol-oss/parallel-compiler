@@ -6,8 +6,8 @@ import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.pipeline.Pass;
-import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
+import com.github.kol.oss.compiler.pipeline.TransformationService;
+import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
 import com.github.kol.oss.compiler.utils.ArithmeticUtils;
 import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
 import com.github.kol.oss.compiler.utils.ChainAssembler;
@@ -17,14 +17,14 @@ import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.*;
 
-public class NormalizationService extends TreeRewritePass {
+public class NormalizationService extends TreeTransformationService {
     public static TokenNode normalize(TokenNode root) {
         return new NormalizationService().apply(root).tree();
     }
 
     @Override
     public String name() {
-        return Pass.NORMALIZATION;
+        return TransformationService.NORMALIZATION;
     }
 
     @Override

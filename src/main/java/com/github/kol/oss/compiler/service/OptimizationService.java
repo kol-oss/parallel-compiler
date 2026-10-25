@@ -12,18 +12,18 @@ import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.exception.ZeroDivisionException;
-import com.github.kol.oss.compiler.pipeline.Pass;
-import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
+import com.github.kol.oss.compiler.pipeline.TransformationService;
+import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
 import com.github.kol.oss.compiler.utils.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class OptimizationService extends TreeRewritePass {
+public class OptimizationService extends TreeTransformationService {
     @Override
     public String name() {
-        return Pass.OPTIMIZATIONS;
+        return TransformationService.OPTIMIZATIONS;
     }
 
     @Override

@@ -5,7 +5,7 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.PositionedException;
-import com.github.kol.oss.compiler.pipeline.PassResult;
+import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -107,7 +107,7 @@ public class OptimizationServiceTest {
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        PassResult result = optimizationService.apply(tree);
+        TransformationResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -123,7 +123,7 @@ public class OptimizationServiceTest {
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        PassResult result = optimizationService.apply(tree);
+        TransformationResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -139,7 +139,7 @@ public class OptimizationServiceTest {
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        PassResult result = optimizationService.apply(tree);
+        TransformationResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -168,7 +168,7 @@ public class OptimizationServiceTest {
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        PassResult result = optimizationService.apply(tree);
+        TransformationResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 
@@ -184,7 +184,7 @@ public class OptimizationServiceTest {
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        PassResult result = optimizationService.apply(tree);
+        TransformationResult result = optimizationService.apply(tree);
 
         TokenNode optimized = result.tree();
 

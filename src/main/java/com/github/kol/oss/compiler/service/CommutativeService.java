@@ -7,8 +7,8 @@ import com.github.kol.oss.compiler.dto.chain.Term;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
-import com.github.kol.oss.compiler.pipeline.Pass;
-import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
+import com.github.kol.oss.compiler.pipeline.TransformationService;
+import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
 import com.github.kol.oss.compiler.utils.ArithmeticUtils;
 import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
 import com.github.kol.oss.compiler.utils.ChainAssembler;
@@ -18,10 +18,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public class CommutativeService extends TreeRewritePass {
+public class CommutativeService extends TreeTransformationService {
     @Override
     public String name() {
-        return Pass.COMMUTATIVE;
+        return TransformationService.COMMUTATIVE;
     }
 
     @Override

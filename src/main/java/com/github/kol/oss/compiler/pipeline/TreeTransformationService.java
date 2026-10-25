@@ -12,9 +12,9 @@ import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.*;
 
-public abstract class TreeRewritePass implements Pass {
+public abstract class TreeTransformationService implements TransformationService {
     @Override
-    public final PassResult apply(TokenNode root) {
+    public final TransformationResult apply(TokenNode root) {
         Context context = new Context();
 
         // find chain roots
@@ -46,7 +46,7 @@ public abstract class TreeRewritePass implements Pass {
             rewriteOperation(operation, context);
         }
 
-        return new PassResult(
+        return new TransformationResult(
                 name(),
                 TreeWalker.resolve(root, context.replacements()),
                 context.applied(),
@@ -87,7 +87,7 @@ public abstract class TreeRewritePass implements Pass {
             context.replace(operation, NodeFactory.operation(operation.getToken(), left, right));
     }
 
-    // holds replacements, applied changes and errors for current pass
+    // holds replacements, applied changes and errors for current transformation
     protected static final class Context {
         private final Map<TokenNode, TokenNode> replacements = new IdentityHashMap<>();
         private final List<Transformation> applied = new ArrayList<>();

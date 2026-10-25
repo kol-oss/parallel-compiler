@@ -2,7 +2,7 @@ package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.pipeline.PassResult;
+import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -91,7 +91,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideCommonMultiplierCases")
     public void givenSumWithCommonMultiplier_whenApplyAssociative_thenTermsGroupedByCommonFactor(String expression, String expectedExpressionFormKey) {
-        PassResult result = applyAssociative(expression);
+        TransformationResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -101,7 +101,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideSharedBracketCases")
     public void givenSumWithSharedBracket_whenApplyAssociative_thenBracketClosedOverCommonFactor(String expression, String expectedExpressionFormKey) {
-        PassResult result = applyAssociative(expression);
+        TransformationResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -111,7 +111,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideCommonDivisorCases")
     public void givenSumWithCommonDivisor_whenApplyAssociative_thenTermsGroupedOverCommonDivisor(String expression, String expectedExpressionFormKey) {
-        PassResult result = applyAssociative(expression);
+        TransformationResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -121,7 +121,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideClosedParenthesesCases")
     public void givenSumWithScatteredFactors_whenApplyAssociative_thenCommonParenthesesClosed(String expression, String expectedExpressionFormKey) {
-        PassResult result = applyAssociative(expression);
+        TransformationResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -131,7 +131,7 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideWithoutCommonFactorCases")
     public void givenSumWithoutCommonFactor_whenApplyAssociative_thenExpressionStaysUnchanged(String expression, String expectedExpressionFormKey) {
-        PassResult result = applyAssociative(expression);
+        TransformationResult result = applyAssociative(expression);
         TokenNode associated = result.tree();
 
         assertNotNull(associated);
@@ -141,12 +141,12 @@ public class AssociativeServiceTest {
     @ParameterizedTest
     @MethodSource("provideRecordedTransformationCases")
     public void givenExpression_whenApplyAssociative_thenTransformationsRecorded(String expression, int expectedTransformations) {
-        PassResult result = applyAssociative(expression);
+        TransformationResult result = applyAssociative(expression);
 
         assertEquals(expectedTransformations, result.applied().size());
     }
 
-    private PassResult applyAssociative(String expression) {
+    private TransformationResult applyAssociative(String expression) {
         List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 

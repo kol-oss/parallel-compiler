@@ -4,8 +4,8 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.LexicalResult;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.pipeline.CompilerPipeline;
-import com.github.kol.oss.compiler.pipeline.Pass;
-import com.github.kol.oss.compiler.pipeline.PassResult;
+import com.github.kol.oss.compiler.pipeline.TransformationService;
+import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import com.github.kol.oss.compiler.service.*;
 import com.github.kol.oss.compiler.view.ConsoleView;
 
@@ -66,26 +66,26 @@ public class Main {
                 TokenNode tree = treeBuildService.buildTree(lexical.tokens());
 
                 TokenNode currentTree;
-                for (PassResult pass : pipeline.run(tree)) {
-                    if (!pass.diagnostics().isEmpty()) {
-                        view.printErrors(value, pass.diagnostics());
+                for (TransformationResult transformation : pipeline.run(tree)) {
+                    if (!transformation.diagnostics().isEmpty()) {
+                        view.printErrors(value, transformation.diagnostics());
                         break;
                     }
 
-                    currentTree = pass.tree();
-                    switch (pass.name()) {
-                        case Pass.OPTIMIZATIONS -> view.printOptimizations(pass.applied());
-                        case Pass.COMMUTATIVE -> {
-                            view.printCommutativeTransformations(pass.applied());
+                    currentTree = transformation.tree();
+                    switch (transformation.name()) {
+                        case TransformationService.OPTIMIZATIONS -> view.printOptimizations(transformation.applied());
+                        case TransformationService.COMMUTATIVE -> {
+                            view.printCommutativeTransformations(transformation.applied());
                             view.printEquivalentForm(currentTree);
                         }
-                        case Pass.ASSOCIATIVE -> {
-                            view.printAssociativeTransformations(pass.applied());
+                        case TransformationService.ASSOCIATIVE -> {
+                            view.printAssociativeTransformations(transformation.applied());
                             currentTree = normalizationService.fold(currentTree);
                             view.printEquivalentForm(currentTree);
                         }
-                        case Pass.PARALLEL -> currentTree = normalizationService.fold(currentTree);
-                        case Pass.NORMALIZATION -> {
+                        case TransformationService.PARALLEL -> currentTree = normalizationService.fold(currentTree);
+                        case TransformationService.NORMALIZATION -> {
                             currentTree = normalizationService.fold(currentTree);
                             view.printEquivalentForm(currentTree);
                             normalizationService.evaluate(currentTree).ifPresent(view::printResult);

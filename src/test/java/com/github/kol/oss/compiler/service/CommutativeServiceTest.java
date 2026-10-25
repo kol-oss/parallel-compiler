@@ -2,7 +2,7 @@ package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
-import com.github.kol.oss.compiler.pipeline.PassResult;
+import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -105,7 +105,7 @@ public class CommutativeServiceTest {
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        PassResult optimized = optimizationService.apply(tree);
+        TransformationResult optimized = optimizationService.apply(tree);
 
         return commutativeService.apply(optimized.tree()).tree();
     }

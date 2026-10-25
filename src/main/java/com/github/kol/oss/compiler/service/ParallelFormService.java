@@ -3,8 +3,8 @@ package com.github.kol.oss.compiler.service;
 import com.github.kol.oss.compiler.constant.OperatorValue;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
-import com.github.kol.oss.compiler.pipeline.Pass;
-import com.github.kol.oss.compiler.pipeline.TreeRewritePass;
+import com.github.kol.oss.compiler.pipeline.TransformationService;
+import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
 import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
 import com.github.kol.oss.compiler.utils.NodeFactory;
 import com.github.kol.oss.compiler.utils.TreeWalker;
@@ -14,10 +14,10 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
-public class ParallelFormService extends TreeRewritePass {
+public class ParallelFormService extends TreeTransformationService {
     @Override
     public String name() {
-        return Pass.PARALLEL;
+        return TransformationService.PARALLEL;
     }
 
     @Override
