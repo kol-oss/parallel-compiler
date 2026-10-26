@@ -20,6 +20,8 @@ import java.util.*;
 
 public class AssociativeService extends TreeTransformationService {
     private static final int SEARCH_BUDGET = 200_000;
+    private static final int VARIANT_LIMIT = 32;
+    private static final int VARIANT_SEARCH_BUDGET = 50_000;
 
     @Override
     public String name() {
@@ -29,6 +31,19 @@ public class AssociativeService extends TreeTransformationService {
     @Override
     protected boolean handlesChain(OperatorValue family) {
         return family == OperatorValue.PLUS;
+    }
+
+    @Override
+    protected List<TokenNode> equivalentForms(TokenNode original, TokenNode transformed) {
+        Set<TokenNode> roots = collectChainRoots(original, family -> family == OperatorValue.PLUS);
+        List<TokenNode> candidates = TreeVariantGenerator.generate(
+                original,
+                roots,
+                this::associativeCandidates,
+                VARIANT_LIMIT
+        );
+
+        return mergeForms(transformed, candidates);
     }
 
     @Override
@@ -43,6 +58,27 @@ public class AssociativeService extends TreeTransformationService {
 
         if (grouped.size() < chain.terms().size())
             context.record(operation, rebuilt);
+    }
+
+    private List<TokenNode> associativeCandidates(OperationNode operation) {
+        Chain chain = ChainAssembler.assemble(operation, Map.of());
+
+        if (chain.family() != OperatorValue.PLUS)
+            return List.of(operation);
+
+        SearchContext search = new SearchContext();
+        List<List<Term>> variants = groupVariants(chain.terms(), search);
+        Map<String, TokenNode> forms = new LinkedHashMap<>();
+
+        for (List<Term> terms : variants) {
+            TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), terms));
+            forms.putIfAbsent(TreeWalker.structuralKey(rebuilt), rebuilt);
+
+            if (forms.size() >= VARIANT_LIMIT)
+                break;
+        }
+
+        return List.copyOf(forms.values());
     }
 
     // find best grouping
@@ -72,6 +108,79 @@ public class AssociativeService extends TreeTransformationService {
 
         search.memo.put(state, best);
         return best;
+    }
+
+    // find all distinct groupings within the search budget
+    private List<List<Term>> groupVariants(List<Term> terms, SearchContext search) {
+        String state = orderedSignature(terms, search);
+        List<List<Term>> cached = search.variantMemo.get(state);
+        if (cached != null)
+            return cached;
+
+        if (--search.variantBudget <= 0)
+            return List.of(terms);
+
+        Map<String, List<Term>> results = new LinkedHashMap<>();
+        results.put(state, terms);
+
+        for (Grouping grouping : options(terms, search)) {
+            for (List<Term> grouped : applyGroupingVariants(terms, grouping, search)) {
+                results.putIfAbsent(orderedSignature(grouped, search), grouped);
+
+                for (List<Term> further : groupVariants(grouped, search)) {
+                    results.putIfAbsent(orderedSignature(further, search), further);
+
+                    if (results.size() >= VARIANT_LIMIT)
+                        break;
+                }
+
+                if (results.size() >= VARIANT_LIMIT)
+                    break;
+            }
+
+            if (results.size() >= VARIANT_LIMIT)
+                break;
+        }
+
+        List<List<Term>> variants = List.copyOf(results.values());
+        search.variantMemo.put(state, variants);
+        return variants;
+    }
+
+    private List<List<Term>> applyGroupingVariants(List<Term> terms, Grouping grouping, SearchContext search) {
+        List<Term> remainders = new ArrayList<>();
+        for (int index : grouping.indexes())
+            remainders.add(remainderTerm(terms.get(index), factorsOf(terms.get(index).node(), search), grouping.factor()));
+
+        // handle signs
+        boolean allNegative = remainders.stream().allMatch(term -> term.sign() == TermSign.NEGATIVE);
+        TermSign groupSign = allNegative ? TermSign.NEGATIVE : TermSign.POSITIVE;
+        List<Term> inner = allNegative ? flipped(remainders) : remainders;
+
+        List<List<Term>> variants = new ArrayList<>();
+
+        for (List<Term> innerVariant : groupVariants(inner, search)) {
+            TokenNode innerSum = BalancedTreeBuilder.buildSigned(new Chain(OperatorValue.PLUS, innerVariant));
+            TokenNode groupNode = grouping.factor().sign() == TermSign.POSITIVE
+                    ? NodeFactory.operation(OperatorValue.MULTIPLY, grouping.factor().node(), innerSum)
+                    : NodeFactory.operation(OperatorValue.DIVISION, innerSum, grouping.factor().node());
+
+            variants.add(insertGroup(terms, grouping.indexes(), new Term(groupNode, groupSign)));
+
+            if (variants.size() >= VARIANT_LIMIT)
+                break;
+        }
+
+        return variants;
+    }
+
+    private String orderedSignature(List<Term> terms, SearchContext search) {
+        List<String> keys = new ArrayList<>(terms.size());
+
+        for (Term term : terms)
+            keys.add((term.sign() == TermSign.POSITIVE ? "+" : "-") + key(term.node(), search));
+
+        return String.join(";", keys);
     }
 
     private List<Grouping> options(List<Term> terms, SearchContext search) {
@@ -388,8 +497,10 @@ public class AssociativeService extends TreeTransformationService {
 
     private static final class SearchContext {
         private final Map<String, List<Term>> memo = new HashMap<>();
+        private final Map<String, List<List<Term>>> variantMemo = new HashMap<>();
         private final Map<TokenNode, Keys> keys = new WeakHashMap<>();
         private final Map<TokenNode, List<Factor>> factors = new WeakHashMap<>();
         private int budget = SEARCH_BUDGET;
+        private int variantBudget = VARIANT_SEARCH_BUDGET;
     }
 }

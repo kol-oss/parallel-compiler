@@ -7,7 +7,6 @@ import com.github.kol.oss.compiler.pipeline.CompilerPipeline;
 import com.github.kol.oss.compiler.pipeline.TransformationService;
 import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import com.github.kol.oss.compiler.service.*;
-import com.github.kol.oss.compiler.utils.TreeMetrics;
 import com.github.kol.oss.compiler.view.ConsoleView;
 
 import java.util.ArrayList;
@@ -79,16 +78,13 @@ public class Main {
                         case TransformationService.OPTIMIZATIONS -> view.printOptimizations(transformation.applied());
                         case TransformationService.COMMUTATIVE -> {
                             view.printCommutativeTransformations(transformation.applied());
-                            view.printEquivalentForm(currentTree);
+                            view.printEquivalentForms(transformation.forms());
                         }
                         case TransformationService.ASSOCIATIVE -> {
-                            if (transformation.applied().isEmpty())
-                                printSkippedAssociative(associativeService, normalizationService, currentTree, view);
-                            else
-                                view.printAssociativeTransformations(transformation.applied());
+                            view.printAssociativeTransformations(transformation.applied());
+                            view.printEquivalentForms(transformation.forms());
 
                             currentTree = normalizationService.fold(currentTree);
-                            view.printEquivalentForm(currentTree);
                         }
                         case TransformationService.PARALLEL -> currentTree = normalizationService.fold(currentTree);
                         case TransformationService.NORMALIZATION -> {
@@ -105,31 +101,6 @@ public class Main {
                 view.printInputLine();
             }
         }
-    }
-
-    private static void printSkippedAssociative(
-            AssociativeService associativeService,
-            NormalizationService normalizationService,
-            TokenNode tree,
-            ConsoleView view
-    ) {
-        TransformationResult candidate = associativeService.apply(tree);
-
-        if (candidate.diagnostics().isEmpty() && !candidate.applied().isEmpty()) {
-            int currentHeight = TreeMetrics.height(NormalizationService.normalize(tree));
-            int candidateHeight = TreeMetrics.height(NormalizationService.normalize(candidate.tree()));
-
-            if (candidateHeight > currentHeight) {
-                view.printSkippedAssociativeForm(
-                        normalizationService.fold(candidate.tree()),
-                        currentHeight,
-                        candidateHeight
-                );
-                return;
-            }
-        }
-
-        view.printAssociativeTransformations(List.of());
     }
 
     private static List<PositionedException> collectErrors(LexicalResult lexical, SyntaxValidationService syntaxValidationService) {

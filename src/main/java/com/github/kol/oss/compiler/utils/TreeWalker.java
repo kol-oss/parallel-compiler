@@ -114,4 +114,26 @@ public class TreeWalker {
 
         return true;
     }
+
+    public static String structuralKey(TokenNode node) {
+        if (node instanceof FunctionNode function) {
+            StringBuilder builder = new StringBuilder(function.getToken().value()).append('(');
+
+            for (int i = 0; i < function.getArguments().size(); i++) {
+                if (i > 0)
+                    builder.append(',');
+
+                builder.append(structuralKey(function.getArguments().get(i)));
+            }
+
+            return builder.append(')').toString();
+        }
+
+        if (node instanceof OperationNode operation)
+            return "(" + structuralKey(operation.getLeft())
+                    + operation.getToken().value()
+                    + structuralKey(operation.getRight()) + ")";
+
+        return node.getToken().value();
+    }
 }

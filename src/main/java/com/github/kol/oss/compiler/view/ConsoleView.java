@@ -4,6 +4,8 @@ import com.github.kol.oss.compiler.dto.change.Transformation;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.PositionedException;
+import com.github.kol.oss.compiler.utils.TreeFormSelector;
+import com.github.kol.oss.compiler.utils.TreeMetrics;
 
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
@@ -13,6 +15,8 @@ import java.util.List;
 import java.util.Scanner;
 
 public class ConsoleView {
+    private static final int MAX_DISPLAYED_FORMS = 1000;
+
     private final Scanner scanner = new Scanner(System.in);
     private final TreeViewRenderer treeRenderer = new TreeViewRenderer();
 
@@ -72,10 +76,25 @@ public class ConsoleView {
         printTransformations(transformations);
     }
 
-    public void printSkippedAssociativeForm(TokenNode shortened, int currentHeight, int candidateHeight) {
-        System.out.println("Associative transformations were not applied: normalized tree height would increase from "
-                + currentHeight + " to " + candidateHeight + ".");
-        System.out.println("Shortened form (not applied): " + ExpressionFormatter.format(shortened));
+    public void printEquivalentForms(List<TokenNode> forms) {
+        List<TokenNode> best = TreeFormSelector.selectBest(forms);
+        int displayed = Math.min(best.size(), MAX_DISPLAYED_FORMS);
+
+        System.out.println("Equivalent forms (" + best.size() + "):");
+
+        for (int i = 0; i < displayed; i++) {
+            TokenNode form = best.get(i);
+            System.out.printf("  %d. %s [height=%d, width=%d]%n",
+                    i + 1,
+                    ExpressionFormatter.format(form),
+                    TreeMetrics.height(form),
+                    TreeMetrics.width(form));
+        }
+
+        if (best.size() > displayed)
+            System.out.println("  ... " + (best.size() - displayed)
+                    + " more forms omitted (display limit: " + MAX_DISPLAYED_FORMS + ")");
+
         System.out.println();
     }
 

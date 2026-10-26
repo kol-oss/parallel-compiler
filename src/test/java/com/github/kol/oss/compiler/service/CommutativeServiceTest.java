@@ -4,16 +4,21 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static com.github.kol.oss.compiler.utils.TokenNodeFormatter.toKey;
+import static com.github.kol.oss.compiler.utils.TreeEvaluator.evaluate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CommutativeServiceTest {
     private LexicalAnalysisService lexicalAnalysisService;
@@ -100,13 +105,40 @@ public class CommutativeServiceTest {
         assertEquals(expectedExpressionFormKey, toKey(commuted));
     }
 
+    @Test
+    public void givenExpression_whenApplyCommutative_thenMultipleEquivalentFormsReturned() {
+        TransformationResult result = applyCommutativeResult("a-b*c+k");
+
+        assertTrue(result.forms().size() > 1);
+        assertSame(result.tree(), result.forms().getFirst());
+        assertEquivalent(result.forms());
+    }
+
     private TokenNode applyCommutative(String expression) {
+        return applyCommutativeResult(expression).tree();
+    }
+
+    private TransformationResult applyCommutativeResult(String expression) {
         List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
         TransformationResult optimized = optimizationService.apply(tree);
 
-        return commutativeService.apply(optimized.tree()).tree();
+        return commutativeService.apply(optimized.tree());
+    }
+
+    private void assertEquivalent(List<TokenNode> forms) {
+        Map<String, Double> values = Map.of(
+                "a", 2.0,
+                "b", 3.0,
+                "c", 5.0,
+                "k", 7.0
+        );
+
+        double expected = evaluate(forms.getFirst(), values);
+
+        for (TokenNode form : forms)
+            assertEquals(expected, evaluate(form, values), 1e-9);
     }
 }

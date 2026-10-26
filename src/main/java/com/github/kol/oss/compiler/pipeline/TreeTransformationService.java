@@ -11,6 +11,7 @@ import com.github.kol.oss.compiler.utils.NodeFactory;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.*;
+import java.util.function.Predicate;
 
 public abstract class TreeTransformationService implements TransformationService {
     @Override
@@ -46,12 +47,42 @@ public abstract class TreeTransformationService implements TransformationService
             rewriteOperation(operation, context);
         }
 
+        TokenNode transformed = TreeWalker.resolve(root, context.replacements());
+
         return new TransformationResult(
                 name(),
-                TreeWalker.resolve(root, context.replacements()),
+                transformed,
+                equivalentForms(root, transformed),
                 context.applied(),
                 context.diagnostics()
         );
+    }
+
+    protected List<TokenNode> equivalentForms(TokenNode original, TokenNode transformed) {
+        return List.of(transformed);
+    }
+
+    protected final Set<TokenNode> collectChainRoots(TokenNode original, Predicate<OperatorValue> families) {
+        Set<TokenNode> roots = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        for (TokenNode node : TreeWalker.collectChainRoots(original, strictChains())) {
+            OperatorValue family = TreeWalker.chainFamily(node);
+
+            if (family != null && families.test(family))
+                roots.add(node);
+        }
+
+        return roots;
+    }
+
+    protected final List<TokenNode> mergeForms(TokenNode primary, List<TokenNode> candidates) {
+        Map<String, TokenNode> forms = new LinkedHashMap<>();
+        forms.put(TreeWalker.structuralKey(primary), primary);
+
+        for (TokenNode candidate : candidates)
+            forms.putIfAbsent(TreeWalker.structuralKey(candidate), candidate);
+
+        return List.copyOf(forms.values());
     }
 
     protected boolean handlesChain(OperatorValue family) {
