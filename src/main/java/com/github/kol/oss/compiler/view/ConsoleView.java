@@ -72,6 +72,13 @@ public class ConsoleView {
         printTransformations(transformations);
     }
 
+    public void printSkippedAssociativeForm(TokenNode shortened, int currentHeight, int candidateHeight) {
+        System.out.println("Associative transformations were not applied: normalized tree height would increase from "
+                + currentHeight + " to " + candidateHeight + ".");
+        System.out.println("Shortened form (not applied): " + ExpressionFormatter.format(shortened));
+        System.out.println();
+    }
+
     public void printEquivalentForm(TokenNode tree) {
         System.out.println("Equivalent form: " + ExpressionFormatter.format(tree));
         System.out.println();
