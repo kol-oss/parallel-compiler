@@ -63,9 +63,13 @@ public abstract class TreeTransformationService implements TransformationService
         return List.of(transformed);
     }
 
-    // selects every new form that is optimal by height first and width second
+    // selects every new form that is optimal by height first and width second;
+    // the incoming form is kept as well when it already is one of the optimal ones
     protected final List<TokenNode> optimalForms(TokenNode original, TokenNode primary, List<TokenNode> candidates) {
-        return TreeFormSelector.selectOptimal(mergeForms(primary, candidates), original);
+        List<TokenNode> forms = new ArrayList<>(mergeForms(primary, candidates));
+        forms.add(original);
+
+        return TreeFormSelector.selectOptimal(forms);
     }
 
     protected final Set<TokenNode> collectChainRoots(TokenNode original, Predicate<OperatorValue> families) {

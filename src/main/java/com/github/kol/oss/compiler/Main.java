@@ -28,9 +28,9 @@ public class Main {
 
         CompilerPipeline pipeline = new CompilerPipeline(List.of(
                 new OptimizationService(),
+                new ParallelFormService(),
                 new CommutativeService(),
                 associativeService,
-                new ParallelFormService(),
                 normalizationService
         ));
 

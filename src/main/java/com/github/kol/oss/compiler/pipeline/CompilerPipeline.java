@@ -23,8 +23,8 @@ public class CompilerPipeline {
             if (!result.diagnostics().isEmpty())
                 break;
 
-            // services already return only optimal equivalent forms, with the
-            // primary form first, so the pipeline simply continues with it
+            // every service keeps its primary form in tree(); the pipeline continues with it,
+            // while the ranked equivalent forms stay available for later selection
             current = result.tree();
         }
 

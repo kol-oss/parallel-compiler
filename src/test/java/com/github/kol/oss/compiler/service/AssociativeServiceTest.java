@@ -18,8 +18,8 @@ import java.util.stream.Stream;
 import static com.github.kol.oss.compiler.utils.TokenNodeFormatter.toKey;
 import static com.github.kol.oss.compiler.utils.TreeEvaluator.evaluate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class AssociativeServiceTest {
@@ -154,18 +154,34 @@ public class AssociativeServiceTest {
     }
 
     @Test
-    public void givenExpressionWithCommonFactor_whenApplyAssociative_thenMultipleEquivalentFormsReturned() {
+    public void givenExpressionWithCommonFactor_whenApplyAssociative_thenRankedEquivalentFormsReturned() {
         TokenNode input = associativeInput("a*b+a*c+b*c");
         TransformationResult result = associativeService.apply(input);
 
-        assertEquals(3, result.forms().size());
-        assertSame(result.tree(), result.forms().getFirst());
+        assertEquals(4, result.forms().size());
         assertEquivalent(result.forms());
-        assertFormsTie(result.forms());
+        assertRanked(result.forms());
         assertEquals(3, TreeMetrics.height(result.forms().getFirst()));
         assertEquals(2, TreeMetrics.width(result.forms().getFirst()));
         assertTrue(result.forms().stream()
-                .noneMatch(form -> TreeWalker.structuralKey(form).equals(TreeWalker.structuralKey(input))));
+                .anyMatch(form -> TreeWalker.structuralKey(form).equals(TreeWalker.structuralKey(input))));
+    }
+
+    @Test
+    public void givenA7_whenApplyAssociative_thenUpToLimitOfFormsRankedByBalance() {
+        TokenNode input = associativeInput("a-b*k+b*t-b*f*f*5.9+b*f*q+b*g*f*5.9-b*g*q-b*w/p+b*y*m/p-b*y/p-x*x/(d+q-w)+3*x/(d+q-w)+3*x/(d+q-w)+3*3/(d+q-w)");
+        TransformationResult result = associativeService.apply(input);
+
+        List<TokenNode> forms = result.forms();
+
+        assertFalse(forms.isEmpty());
+        assertTrue(forms.size() <= 500);
+        assertEquivalent(forms);
+        assertRanked(forms);
+        assertEquals(6, TreeMetrics.height(forms.getFirst()));
+        assertEquals(14, TreeMetrics.width(forms.getFirst()));
+        assertTrue(forms.stream()
+                .anyMatch(form -> TreeWalker.structuralKey(form).equals(TreeWalker.structuralKey(input))));
     }
 
     @Test
@@ -177,7 +193,10 @@ public class AssociativeServiceTest {
         assertEquals(6, TreeMetrics.width(input));
         assertEquals(6, TreeMetrics.height(result.tree()));
         assertEquals(6, TreeMetrics.width(result.tree()));
-        assertEquals(0, result.forms().size());
+
+        // there is nothing to factor out, so the input itself is the only equivalent form
+        assertEquals(1, result.forms().size());
+        assertEquals(TreeWalker.structuralKey(input), TreeWalker.structuralKey(result.forms().getFirst()));
     }
 
     private TransformationResult applyAssociative(String expression) {
@@ -207,14 +226,19 @@ public class AssociativeServiceTest {
             assertEquals(expected, evaluate(form, values), 1e-9);
     }
 
-    // every returned form must share the same optimal height and width
-    private void assertFormsTie(List<TokenNode> forms) {
-        int height = TreeMetrics.height(forms.getFirst());
-        int width = TreeMetrics.width(forms.getFirst());
+    // every returned form must not be worse than the previous one: height grows, then width shrinks
+    private void assertRanked(List<TokenNode> forms) {
+        int previousHeight = -1;
+        int previousWidth = Integer.MAX_VALUE;
 
         for (TokenNode form : forms) {
-            assertEquals(height, TreeMetrics.height(form), toKey(form));
-            assertEquals(width, TreeMetrics.width(form), toKey(form));
+            int height = TreeMetrics.height(form);
+            int width = TreeMetrics.width(form);
+
+            assertTrue(height > previousHeight || height == previousHeight && width <= previousWidth, toKey(form));
+
+            previousHeight = height;
+            previousWidth = width;
         }
     }
 }

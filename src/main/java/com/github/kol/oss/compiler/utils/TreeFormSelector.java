@@ -3,11 +3,13 @@ package com.github.kol.oss.compiler.utils;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// selects equivalent forms that are optimal by height first and width second
+// selects equivalent forms by height first and width second: either keeps the optimal
+// ones or returns a ranked set, where the incoming form participates like any other
 public final class TreeFormSelector {
     private TreeFormSelector() {
     }
@@ -35,9 +37,9 @@ public final class TreeFormSelector {
                 .toList();
     }
 
-    // keeps every unique candidate that is optimal by height first and width second,
-    // then drops the original input itself: the result contains only new equivalent forms
-    public static List<TokenNode> selectOptimal(List<TokenNode> candidates, TokenNode original) {
+    // keeps every unique candidate that is optimal by height first and width second;
+    // the original input is passed in by the caller and stays if it is optimal as well
+    public static List<TokenNode> selectOptimal(List<TokenNode> candidates) {
         if (candidates.isEmpty())
             return List.of();
 
@@ -46,10 +48,29 @@ public final class TreeFormSelector {
         for (TokenNode candidate : candidates)
             unique.putIfAbsent(TreeWalker.structuralKey(candidate), candidate);
 
-        String originalKey = original == null ? null : TreeWalker.structuralKey(original);
+        return selectBest(new ArrayList<>(unique.values()));
+    }
 
-        return selectBest(new ArrayList<>(unique.values())).stream()
-                .filter(form -> originalKey == null || !TreeWalker.structuralKey(form).equals(originalKey))
+    // keeps up to limit unique candidates ranked minimal height first, then maximal width;
+    // lower-ranked forms are kept as well, so all of them stay available for selection
+    public static List<TokenNode> selectRanked(List<TokenNode> candidates, int limit) {
+        if (candidates.isEmpty() || limit <= 0)
+            return List.of();
+
+        Map<String, TokenNode> unique = new LinkedHashMap<>();
+
+        for (TokenNode candidate : candidates)
+            unique.putIfAbsent(TreeWalker.structuralKey(candidate), candidate);
+
+        return unique.values().stream()
+                .map(form -> new RankedForm(form, TreeMetrics.height(form), TreeMetrics.width(form)))
+                .sorted(Comparator.comparingInt(RankedForm::height)
+                        .thenComparing(Comparator.comparingInt(RankedForm::width).reversed()))
+                .limit(limit)
+                .map(RankedForm::tree)
                 .toList();
+    }
+
+    private record RankedForm(TokenNode tree, int height, int width) {
     }
 }

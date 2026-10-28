@@ -118,12 +118,13 @@ public class CommutativeServiceTest {
     }
 
     @Test
-    public void givenTwoTerms_whenApplyCommutative_thenOnlySwappedFormReturned() {
+    public void givenTwoTerms_whenApplyCommutative_thenBothFormsReturned() {
         TransformationResult result = applyCommutativeResult("a+b");
 
         assertEquals("(a+b)", toKey(result.tree()));
-        assertEquals(1, result.forms().size());
-        assertEquals("(b+a)", toKey(result.forms().getFirst()));
+        assertEquals(2, result.forms().size());
+        assertEquals("(a+b)", toKey(result.forms().getFirst()));
+        assertEquals("(b+a)", toKey(result.forms().get(1)));
     }
 
     @Test
@@ -154,13 +155,23 @@ public class CommutativeServiceTest {
     }
 
     @Test
-    public void givenExpression_whenApplyCommutative_thenInputFormExcludedFromForms() {
+    public void givenNonOptimalInput_whenApplyCommutative_thenInputFormIsNotReturned() {
         TokenNode input = commutativeInput("a+b+c+d");
         TransformationResult result = commutativeService.apply(input);
         String inputKey = TreeWalker.structuralKey(input);
 
         assertTrue(result.forms().stream()
                 .noneMatch(form -> TreeWalker.structuralKey(form).equals(inputKey)));
+    }
+
+    @Test
+    public void givenOptimalInput_whenApplyCommutative_thenInputFormIsReturned() {
+        TokenNode input = commutativeInput("a+b*c");
+        TransformationResult result = commutativeService.apply(input);
+        String inputKey = TreeWalker.structuralKey(input);
+
+        assertTrue(result.forms().stream()
+                .anyMatch(form -> TreeWalker.structuralKey(form).equals(inputKey)));
     }
 
     private TokenNode applyCommutative(String expression) {

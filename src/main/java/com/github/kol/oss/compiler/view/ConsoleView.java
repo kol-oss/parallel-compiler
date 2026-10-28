@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Scanner;
 
 public class ConsoleView {
-    private static final int MAX_DISPLAYED_FORMS = 1000;
+    private static final int MAX_DISPLAYED_FORMS = 100;
 
     private final Scanner scanner = new Scanner(System.in);
     private final TreeViewRenderer treeRenderer = new TreeViewRenderer();
@@ -76,7 +76,7 @@ public class ConsoleView {
     }
 
     public void printEquivalentForms(List<TokenNode> forms) {
-        // the services already return only optimal forms (min height, max width)
+        // commutative forms are optimal (min height, max width), associative forms are ranked best first
         int displayed = Math.min(forms.size(), MAX_DISPLAYED_FORMS);
 
         System.out.println("Equivalent forms (" + forms.size() + "):");

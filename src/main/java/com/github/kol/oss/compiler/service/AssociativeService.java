@@ -23,6 +23,7 @@ public class AssociativeService extends TreeTransformationService {
     private static final int VARIANT_LIMIT = 20_000;
     private static final int VARIANT_SEARCH_BUDGET = 1_000_000;
     private static final int MAX_TREE_VARIANTS = 50_000;
+    private static final int MAX_EQUIVALENT_FORMS = 500;
 
     @Override
     public String name() {
@@ -39,7 +40,7 @@ public class AssociativeService extends TreeTransformationService {
         Set<TokenNode> roots = collectChainRoots(original, family -> family == OperatorValue.PLUS);
 
         if (roots.isEmpty())
-            return optimalForms(original, transformed, List.of());
+            return rankedForms(original, transformed, List.of());
 
         List<TokenNode> candidates = TreeVariantGenerator.generate(
                 original,
@@ -48,7 +49,16 @@ public class AssociativeService extends TreeTransformationService {
                 MAX_TREE_VARIANTS
         );
 
-        return optimalForms(original, transformed, candidates);
+        return rankedForms(original, transformed, candidates);
+    }
+
+    // the incoming form is ranked together with the generated ones and stays in the set
+    // as long as it fits into the form limit
+    private List<TokenNode> rankedForms(TokenNode original, TokenNode transformed, List<TokenNode> candidates) {
+        List<TokenNode> forms = new ArrayList<>(mergeForms(transformed, candidates));
+        forms.add(original);
+
+        return TreeFormSelector.selectRanked(forms, MAX_EQUIVALENT_FORMS);
     }
 
     @Override
