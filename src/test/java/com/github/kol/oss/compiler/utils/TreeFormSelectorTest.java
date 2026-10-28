@@ -7,6 +7,7 @@ import com.github.kol.oss.compiler.dto.token.Token;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,6 +41,30 @@ public class TreeFormSelectorTest {
     public void givenLimit_whenSelectRanked_thenOnlyBestFormsAreReturned() {
         assertEquals(keys(ORIGINAL, BALANCED), keys(TreeFormSelector.selectRanked(List.of(DEEP, NARROW, BALANCED, ORIGINAL), 2)));
         assertTrue(TreeFormSelector.selectRanked(List.of(DEEP, NARROW, BALANCED, ORIGINAL), 0).isEmpty());
+    }
+
+    @Test
+    public void givenMandatoryForm_whenSelectRanked_thenMandatoryFormSurvivesTheLimit() {
+        List<TokenNode> ranked = TreeFormSelector.selectRanked(
+                List.of(DEEP, NARROW, BALANCED, ORIGINAL),
+                2,
+                Set.of(TreeWalker.structuralKey(DEEP))
+        );
+
+        assertEquals(2, ranked.size());
+        assertTrue(keys(ranked).contains(TreeWalker.structuralKey(DEEP)));
+        assertTrue(keys(ranked).contains(TreeWalker.structuralKey(ORIGINAL)));
+    }
+
+    @Test
+    public void givenUnknownMandatoryKey_whenSelectRanked_thenLimitIsUnchanged() {
+        List<TokenNode> ranked = TreeFormSelector.selectRanked(
+                List.of(DEEP, NARROW, BALANCED, ORIGINAL),
+                2,
+                Set.of("unknown")
+        );
+
+        assertEquals(keys(ORIGINAL, BALANCED), keys(ranked));
     }
 
     private static List<String> keys(TokenNode... nodes) {

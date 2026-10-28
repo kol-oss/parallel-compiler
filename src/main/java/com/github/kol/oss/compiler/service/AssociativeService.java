@@ -24,6 +24,9 @@ public class AssociativeService extends TreeTransformationService {
     private static final int VARIANT_SEARCH_BUDGET = 1_000_000;
     private static final int MAX_TREE_VARIANTS = 50_000;
     private static final int MAX_EQUIVALENT_FORMS = 500;
+    // a factor shared by many terms can be taken out of any subset of them, not only
+    // out of all of them, so subset grouping is enumerated up to this bound
+    private static final int MAX_GROUPINGS_PER_FACTOR = 128;
 
     @Override
     public String name() {
@@ -58,7 +61,13 @@ public class AssociativeService extends TreeTransformationService {
         List<TokenNode> forms = new ArrayList<>(mergeForms(transformed, candidates));
         forms.add(original);
 
-        return TreeFormSelector.selectRanked(forms, MAX_EQUIVALENT_FORMS);
+        // the incoming form is part of the equivalent set even when the ranking limit
+        // would otherwise cut it; without it lab 6 loses one of the available trees
+        Set<String> mandatory = new LinkedHashSet<>();
+        mandatory.add(TreeWalker.structuralKey(original));
+        mandatory.add(TreeWalker.structuralKey(transformed));
+
+        return TreeFormSelector.selectRanked(forms, MAX_EQUIVALENT_FORMS, mandatory);
     }
 
     @Override
@@ -84,7 +93,13 @@ public class AssociativeService extends TreeTransformationService {
             return List.of(operation);
 
         SearchContext search = new SearchContext();
-        List<List<Term>> variants = groupVariants(chain.terms(), search);
+
+        // full-grouping variants are generated first so the complete factorings are
+        // always present; partial (subset) factorings are added on top of them and get
+        // a separate search budget so they cannot starve the complete factorings
+        List<List<Term>> variants = new ArrayList<>(groupVariants(chain.terms(), search, false));
+        variants.addAll(groupVariants(chain.terms(), new SearchContext(), true));
+
         Map<String, TokenNode> forms = new LinkedHashMap<>();
         int originalSize = chain.terms().size();
 
@@ -124,8 +139,9 @@ public class AssociativeService extends TreeTransformationService {
         List<Term> best = terms;
         int bestCost = cost(terms);
 
-        // try groupings
-        for (Grouping grouping : options(terms, search)) {
+        // try groupings; the primary transformation keeps the original full-subset
+        // strategy so its choice does not depend on the extra variant enumeration
+        for (Grouping grouping : options(terms, search, false)) {
             List<Term> candidate = groupFactors(applyGrouping(terms, grouping, search), search);
             int candidateCost = cost(candidate);
 
@@ -140,9 +156,10 @@ public class AssociativeService extends TreeTransformationService {
     }
 
     // find all distinct groupings within the search budget
-    private List<List<Term>> groupVariants(List<Term> terms, SearchContext search) {
+    private List<List<Term>> groupVariants(List<Term> terms, SearchContext search, boolean includeSubsets) {
         String state = orderedSignature(terms, search);
-        List<List<Term>> cached = search.variantMemo.get(state);
+        Map<String, List<List<Term>>> memo = includeSubsets ? search.subsetVariantMemo : search.variantMemo;
+        List<List<Term>> cached = memo.get(state);
         if (cached != null)
             return cached;
 
@@ -152,11 +169,11 @@ public class AssociativeService extends TreeTransformationService {
         Map<String, List<Term>> results = new LinkedHashMap<>();
         results.put(state, terms);
 
-        for (Grouping grouping : options(terms, search)) {
-            for (List<Term> grouped : applyGroupingVariants(terms, grouping, search)) {
+        for (Grouping grouping : options(terms, search, includeSubsets)) {
+            for (List<Term> grouped : applyGroupingVariants(terms, grouping, search, includeSubsets)) {
                 results.putIfAbsent(orderedSignature(grouped, search), grouped);
 
-                for (List<Term> further : groupVariants(grouped, search)) {
+                for (List<Term> further : groupVariants(grouped, search, includeSubsets)) {
                     results.putIfAbsent(orderedSignature(further, search), further);
 
                     if (results.size() >= VARIANT_LIMIT)
@@ -172,11 +189,11 @@ public class AssociativeService extends TreeTransformationService {
         }
 
         List<List<Term>> variants = List.copyOf(results.values());
-        search.variantMemo.put(state, variants);
+        memo.put(state, variants);
         return variants;
     }
 
-    private List<List<Term>> applyGroupingVariants(List<Term> terms, Grouping grouping, SearchContext search) {
+    private List<List<Term>> applyGroupingVariants(List<Term> terms, Grouping grouping, SearchContext search, boolean includeSubsets) {
         List<Term> remainders = new ArrayList<>();
         for (int index : grouping.indexes())
             remainders.add(remainderTerm(terms.get(index), factorsOf(terms.get(index).node(), search), grouping.factor()));
@@ -188,7 +205,7 @@ public class AssociativeService extends TreeTransformationService {
 
         List<List<Term>> variants = new ArrayList<>();
 
-        for (List<Term> innerVariant : groupVariants(inner, search)) {
+        for (List<Term> innerVariant : groupVariants(inner, search, includeSubsets)) {
             TokenNode innerSum = BalancedTreeBuilder.buildBalanced(new Chain(OperatorValue.PLUS, innerVariant));
             TokenNode groupNode = grouping.factor().sign() == TermSign.POSITIVE
                     ? NodeFactory.operation(OperatorValue.MULTIPLY, grouping.factor().node(), innerSum)
@@ -212,13 +229,14 @@ public class AssociativeService extends TreeTransformationService {
         return String.join(";", keys);
     }
 
-    private List<Grouping> options(List<Term> terms, SearchContext search) {
+    private List<Grouping> options(List<Term> terms, SearchContext search, boolean includeSubsets) {
         // get factors per term
         List<List<Factor>> termFactors = new ArrayList<>();
         for (Term term : terms)
             termFactors.add(factorsOf(term.node(), search));
 
         List<Grouping> result = new ArrayList<>();
+        List<Grouping> partial = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
         for (List<Factor> factors : termFactors) {
@@ -229,12 +247,67 @@ public class AssociativeService extends TreeTransformationService {
 
                 // find matches
                 List<Integer> indexes = matchingIndexes(termFactors, candidate);
-                if (indexes.size() >= 2 && !allNeutral(terms, termFactors, indexes, candidate, search))
+                if (indexes.size() < 2)
+                    continue;
+
+                if (!allNeutral(terms, termFactors, indexes, candidate, search))
                     result.add(new Grouping(indexes, candidate));
+
+                if (!includeSubsets)
+                    continue;
+
+                // a common factor can also be taken out of any proper subset of matching
+                // terms; all full groups are emitted first so complete factorings keep
+                // the same enumeration order and stay inside the search budget
+                for (List<Integer> group : indexGroups(indexes)) {
+                    if (group.size() == indexes.size())
+                        continue;
+
+                    if (!allNeutral(terms, termFactors, group, candidate, search))
+                        partial.add(new Grouping(group, candidate));
+                }
             }
         }
 
+        result.addAll(partial);
         return result;
+    }
+
+    private List<List<Integer>> indexGroups(List<Integer> indexes) {
+        List<List<Integer>> groups = new ArrayList<>();
+        if (indexes.size() < 2)
+            return groups;
+
+        for (int size = indexes.size(); size >= 2 && groups.size() < MAX_GROUPINGS_PER_FACTOR; size--)
+            collectIndexGroups(indexes, size, 0, new ArrayList<>(), groups);
+
+        return groups;
+    }
+
+    private void collectIndexGroups(
+            List<Integer> indexes,
+            int size,
+            int start,
+            List<Integer> current,
+            List<List<Integer>> groups
+    ) {
+        if (groups.size() >= MAX_GROUPINGS_PER_FACTOR)
+            return;
+
+        if (current.size() == size) {
+            groups.add(List.copyOf(current));
+            return;
+        }
+
+        int remaining = size - current.size();
+        for (int i = start; i <= indexes.size() - remaining; i++) {
+            current.add(indexes.get(i));
+            collectIndexGroups(indexes, size, i + 1, current, groups);
+            current.removeLast();
+
+            if (groups.size() >= MAX_GROUPINGS_PER_FACTOR)
+                return;
+        }
     }
 
     // find matching term indexes
@@ -527,6 +600,7 @@ public class AssociativeService extends TreeTransformationService {
     private static final class SearchContext {
         private final Map<String, List<Term>> memo = new HashMap<>();
         private final Map<String, List<List<Term>>> variantMemo = new HashMap<>();
+        private final Map<String, List<List<Term>>> subsetVariantMemo = new HashMap<>();
         private final Map<TokenNode, Keys> keys = new WeakHashMap<>();
         private final Map<TokenNode, List<Factor>> factors = new WeakHashMap<>();
         private int budget = SEARCH_BUDGET;
