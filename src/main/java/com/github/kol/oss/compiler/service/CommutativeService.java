@@ -24,8 +24,11 @@ import java.util.Map;
 import java.util.Set;
 
 public class CommutativeService extends TreeTransformationService {
-    private static final int VARIANT_LIMIT = 64;
-    private static final int ORDER_LIMIT = 12;
+    // every order of a chain is a distinct equivalent form, so the complete
+    // search is factorial; the caps keep the enumeration deterministic and bounded
+    private static final int MAX_ORDER_VARIANTS = 50_000;
+    private static final int MAX_CHAIN_FORMS = 50_000;
+    private static final int MAX_TREE_VARIANTS = 50_000;
 
     @Override
     public String name() {
@@ -35,14 +38,18 @@ public class CommutativeService extends TreeTransformationService {
     @Override
     protected List<TokenNode> equivalentForms(TokenNode original, TokenNode transformed) {
         Set<TokenNode> roots = collectChainRoots(original, _ -> true);
+
+        if (roots.isEmpty())
+            return optimalForms(original, transformed, List.of());
+
         List<TokenNode> candidates = TreeVariantGenerator.generate(
                 original,
                 roots,
                 this::commutativeCandidates,
-                VARIANT_LIMIT
+                MAX_TREE_VARIANTS
         );
 
-        return mergeForms(transformed, candidates);
+        return optimalForms(original, transformed, candidates);
     }
 
     @Override
@@ -73,6 +80,7 @@ public class CommutativeService extends TreeTransformationService {
             context.record(operation, rebuilt);
     }
 
+    // returns every order of the chain, not only a heuristic subset
     private List<TokenNode> commutativeCandidates(OperationNode operation) {
         Chain chain = ChainAssembler.assemble(operation, Map.of());
         List<Term> terms = chain.family() == OperatorValue.PLUS ? dropZeros(chain.terms()) : chain.terms();
@@ -83,11 +91,19 @@ public class CommutativeService extends TreeTransformationService {
         Map<String, TokenNode> forms = new LinkedHashMap<>();
         addCandidate(forms, chain, canonicalOrder(terms));
 
-        for (List<Term> ordered : alternativeOrders(terms)) {
-            addCandidate(forms, chain, ordered);
+        List<List<Term>> positiveOrders = orderingsUpTo(distinctTerms(filter(terms, TermSign.POSITIVE)));
+        List<List<Term>> negativeOrders = orderingsUpTo(distinctTerms(filter(terms, TermSign.NEGATIVE)));
+        int examined = 0;
 
-            if (forms.size() >= VARIANT_LIMIT)
-                break;
+        for (List<Term> positives : positiveOrders) {
+            for (List<Term> negatives : negativeOrders) {
+                List<Term> ordered = new ArrayList<>(positives);
+                ordered.addAll(negatives);
+                addCandidate(forms, chain, ordered);
+
+                if (++examined >= MAX_CHAIN_FORMS || forms.size() >= MAX_CHAIN_FORMS)
+                    return List.copyOf(forms.values());
+            }
         }
 
         return List.copyOf(forms.values());
@@ -100,129 +116,47 @@ public class CommutativeService extends TreeTransformationService {
         return reordered;
     }
 
-    private List<List<Term>> alternativeOrders(List<Term> terms) {
-        List<List<Term>> positiveOrders = orderings(filter(terms, TermSign.POSITIVE));
-        List<List<Term>> negativeOrders = orderings(filter(terms, TermSign.NEGATIVE));
+    // identical terms produce identical forms, so they are enumerated once
+    private List<Term> distinctTerms(List<Term> terms) {
+        Map<String, Term> unique = new LinkedHashMap<>();
+
+        for (Term term : terms)
+            unique.putIfAbsent(term.sign() + ":" + TreeWalker.structuralKey(term.node()), term);
+
+        return List.copyOf(unique.values());
+    }
+
+    private List<List<Term>> orderingsUpTo(List<Term> terms) {
         List<List<Term>> result = new ArrayList<>();
 
-        for (List<Term> positives : positiveOrders) {
-            for (List<Term> negatives : negativeOrders) {
-                List<Term> ordered = new ArrayList<>(positives);
-                ordered.addAll(negatives);
-                result.add(ordered);
-
-                if (result.size() >= ORDER_LIMIT)
-                    return result;
-            }
+        if (terms.size() <= 1) {
+            result.add(List.copyOf(terms));
+            return result;
         }
 
-        return result;
-    }
-
-    // different orders of terms with the same sign
-    private List<List<Term>> orderings(List<Term> terms) {
-        if (terms.size() <= 1)
-            return List.of(terms);
-
-        Map<String, List<Term>> orders = new LinkedHashMap<>();
-        addOrder(orders, terms);
-        addOrder(orders, sortedByWeight(terms));
-        addOrder(orders, sortedByWeightAscending(terms));
-        addOrder(orders, alternating(terms));
-        addOrder(orders, reversed(terms));
-
-        List<Term> descending = sortedByWeight(terms);
-        for (int shift = 1; shift < descending.size(); shift++) {
-            addOrder(orders, rotate(descending, shift));
-
-            if (orders.size() >= ORDER_LIMIT)
-                return List.copyOf(orders.values());
-        }
-
-        if (terms.size() <= 4) {
-            for (List<Term> permutation : permutations(terms)) {
-                addOrder(orders, permutation);
-
-                if (orders.size() >= ORDER_LIMIT)
-                    break;
-            }
-        }
-
-        return List.copyOf(orders.values());
-    }
-
-    private void addOrder(Map<String, List<Term>> orders, List<Term> terms) {
-        StringBuilder key = new StringBuilder();
-
-        for (Term term : terms) {
-            key.append(term.sign())
-                    .append(TreeWalker.structuralKey(term.node()))
-                    .append(';');
-        }
-
-        orders.putIfAbsent(key.toString(), List.copyOf(terms));
-    }
-
-    private void addCandidate(Map<String, TokenNode> forms, Chain chain, List<Term> ordered) {
-        TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), ordered));
-        forms.putIfAbsent(TreeWalker.structuralKey(rebuilt), rebuilt);
-    }
-
-    private List<Term> sortedByWeightAscending(List<Term> terms) {
-        return terms.stream()
-                .sorted(Comparator.comparingInt(term -> term.node().getWeight()))
-                .toList();
-    }
-
-    private List<Term> alternating(List<Term> terms) {
-        List<Term> sorted = sortedByWeight(terms);
-        List<Term> result = new ArrayList<>();
-        int left = 0;
-        int right = sorted.size() - 1;
-
-        while (left <= right) {
-            result.add(sorted.get(left++));
-
-            if (left <= right)
-                result.add(sorted.get(right--));
-        }
-
-        return result;
-    }
-
-    private List<Term> reversed(List<Term> terms) {
-        List<Term> result = new ArrayList<>(terms);
-        Collections.reverse(result);
-        return result;
-    }
-
-    private List<Term> rotate(List<Term> terms, int shift) {
-        List<Term> result = new ArrayList<>(terms.size());
-
-        for (int i = 0; i < terms.size(); i++)
-            result.add(terms.get((i + shift) % terms.size()));
-
-        return result;
-    }
-
-    private List<List<Term>> permutations(List<Term> terms) {
-        List<Term> mutable = new ArrayList<>(terms);
-        List<List<Term>> result = new ArrayList<>();
-        permute(mutable, 0, result);
+        permute(new ArrayList<>(terms), 0, result);
         return result;
     }
 
     private void permute(List<Term> terms, int index, List<List<Term>> result) {
+        if (result.size() >= MAX_ORDER_VARIANTS)
+            return;
+
         if (index == terms.size()) {
             result.add(List.copyOf(terms));
             return;
         }
 
-        for (int i = index; i < terms.size(); i++) {
+        for (int i = index; i < terms.size() && result.size() < MAX_ORDER_VARIANTS; i++) {
             Collections.swap(terms, index, i);
             permute(terms, index + 1, result);
             Collections.swap(terms, index, i);
         }
+    }
+
+    private void addCandidate(Map<String, TokenNode> forms, Chain chain, List<Term> ordered) {
+        TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), ordered));
+        forms.putIfAbsent(TreeWalker.structuralKey(rebuilt), rebuilt);
     }
 
     // filter by sign

@@ -8,6 +8,7 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.utils.NodeFactory;
+import com.github.kol.oss.compiler.utils.TreeFormSelector;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.*;
@@ -60,6 +61,11 @@ public abstract class TreeTransformationService implements TransformationService
 
     protected List<TokenNode> equivalentForms(TokenNode original, TokenNode transformed) {
         return List.of(transformed);
+    }
+
+    // selects every new form that is optimal by height first and width second
+    protected final List<TokenNode> optimalForms(TokenNode original, TokenNode primary, List<TokenNode> candidates) {
+        return TreeFormSelector.selectOptimal(mergeForms(primary, candidates), original);
     }
 
     protected final Set<TokenNode> collectChainRoots(TokenNode original, Predicate<OperatorValue> families) {

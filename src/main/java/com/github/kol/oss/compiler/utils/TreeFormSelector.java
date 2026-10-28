@@ -2,9 +2,12 @@ package com.github.kol.oss.compiler.utils;
 
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-// keeps only forms with the smallest height and, among them, the largest width
+// selects equivalent forms that are optimal by height first and width second
 public final class TreeFormSelector {
     private TreeFormSelector() {
     }
@@ -29,6 +32,24 @@ public final class TreeFormSelector {
 
         return shortest.stream()
                 .filter(form -> TreeMetrics.width(form) == maxWidth)
+                .toList();
+    }
+
+    // keeps every unique candidate that is optimal by height first and width second,
+    // then drops the original input itself: the result contains only new equivalent forms
+    public static List<TokenNode> selectOptimal(List<TokenNode> candidates, TokenNode original) {
+        if (candidates.isEmpty())
+            return List.of();
+
+        Map<String, TokenNode> unique = new LinkedHashMap<>();
+
+        for (TokenNode candidate : candidates)
+            unique.putIfAbsent(TreeWalker.structuralKey(candidate), candidate);
+
+        String originalKey = original == null ? null : TreeWalker.structuralKey(original);
+
+        return selectBest(new ArrayList<>(unique.values())).stream()
+                .filter(form -> originalKey == null || !TreeWalker.structuralKey(form).equals(originalKey))
                 .toList();
     }
 }

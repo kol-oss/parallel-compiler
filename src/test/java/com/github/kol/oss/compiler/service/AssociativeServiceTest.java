@@ -3,6 +3,8 @@ package com.github.kol.oss.compiler.service;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.pipeline.TransformationResult;
+import com.github.kol.oss.compiler.utils.TreeMetrics;
+import com.github.kol.oss.compiler.utils.TreeWalker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -153,22 +155,31 @@ public class AssociativeServiceTest {
 
     @Test
     public void givenExpressionWithCommonFactor_whenApplyAssociative_thenMultipleEquivalentFormsReturned() {
-        TransformationResult result = applyAssociative("a*b+a*c+b*c");
+        TokenNode input = associativeInput("a*b+a*c+b*c");
+        TransformationResult result = associativeService.apply(input);
 
-        assertTrue(result.forms().size() > 1);
+        assertEquals(3, result.forms().size());
         assertSame(result.tree(), result.forms().getFirst());
         assertEquivalent(result.forms());
+        assertFormsTie(result.forms());
+        assertEquals(3, TreeMetrics.height(result.forms().getFirst()));
+        assertEquals(2, TreeMetrics.width(result.forms().getFirst()));
+        assertTrue(result.forms().stream()
+                .noneMatch(form -> TreeWalker.structuralKey(form).equals(TreeWalker.structuralKey(input))));
     }
 
     private TransformationResult applyAssociative(String expression) {
+        return associativeService.apply(associativeInput(expression));
+    }
+
+    // associative service receives the primary form produced by the commutative service
+    private TokenNode associativeInput(String expression) {
         List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
         TokenNode optimized = optimizationService.apply(tree).tree();
-        TokenNode commuted = commutativeService.apply(optimized).tree();
-
-        return associativeService.apply(commuted);
+        return commutativeService.apply(optimized).tree();
     }
 
     private void assertEquivalent(List<TokenNode> forms) {
@@ -182,5 +193,16 @@ public class AssociativeServiceTest {
 
         for (TokenNode form : forms)
             assertEquals(expected, evaluate(form, values), 1e-9);
+    }
+
+    // every returned form must share the same optimal height and width
+    private void assertFormsTie(List<TokenNode> forms) {
+        int height = TreeMetrics.height(forms.getFirst());
+        int width = TreeMetrics.width(forms.getFirst());
+
+        for (TokenNode form : forms) {
+            assertEquals(height, TreeMetrics.height(form), toKey(form));
+            assertEquals(width, TreeMetrics.width(form), toKey(form));
+        }
     }
 }

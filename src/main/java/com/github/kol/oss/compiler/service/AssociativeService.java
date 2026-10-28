@@ -20,8 +20,9 @@ import java.util.*;
 
 public class AssociativeService extends TreeTransformationService {
     private static final int SEARCH_BUDGET = 200_000;
-    private static final int VARIANT_LIMIT = 32;
-    private static final int VARIANT_SEARCH_BUDGET = 50_000;
+    private static final int VARIANT_LIMIT = 20_000;
+    private static final int VARIANT_SEARCH_BUDGET = 1_000_000;
+    private static final int MAX_TREE_VARIANTS = 50_000;
 
     @Override
     public String name() {
@@ -36,14 +37,18 @@ public class AssociativeService extends TreeTransformationService {
     @Override
     protected List<TokenNode> equivalentForms(TokenNode original, TokenNode transformed) {
         Set<TokenNode> roots = collectChainRoots(original, family -> family == OperatorValue.PLUS);
+
+        if (roots.isEmpty())
+            return optimalForms(original, transformed, List.of());
+
         List<TokenNode> candidates = TreeVariantGenerator.generate(
                 original,
                 roots,
                 this::associativeCandidates,
-                VARIANT_LIMIT
+                MAX_TREE_VARIANTS
         );
 
-        return mergeForms(transformed, candidates);
+        return optimalForms(original, transformed, candidates);
     }
 
     @Override
@@ -69,8 +74,13 @@ public class AssociativeService extends TreeTransformationService {
         SearchContext search = new SearchContext();
         List<List<Term>> variants = groupVariants(chain.terms(), search);
         Map<String, TokenNode> forms = new LinkedHashMap<>();
+        int originalSize = chain.terms().size();
 
         for (List<Term> terms : variants) {
+            // only variants where at least one common factor was actually taken out
+            if (terms.size() >= originalSize)
+                continue;
+
             TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), terms));
             forms.putIfAbsent(TreeWalker.structuralKey(rebuilt), rebuilt);
 

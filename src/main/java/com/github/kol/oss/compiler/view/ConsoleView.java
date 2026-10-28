@@ -4,7 +4,6 @@ import com.github.kol.oss.compiler.dto.change.Transformation;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.PositionedException;
-import com.github.kol.oss.compiler.utils.TreeFormSelector;
 import com.github.kol.oss.compiler.utils.TreeMetrics;
 
 import java.io.FileDescriptor;
@@ -77,13 +76,13 @@ public class ConsoleView {
     }
 
     public void printEquivalentForms(List<TokenNode> forms) {
-        List<TokenNode> best = TreeFormSelector.selectBest(forms);
-        int displayed = Math.min(best.size(), MAX_DISPLAYED_FORMS);
+        // the services already return only optimal forms (min height, max width)
+        int displayed = Math.min(forms.size(), MAX_DISPLAYED_FORMS);
 
-        System.out.println("Equivalent forms (" + best.size() + "):");
+        System.out.println("Equivalent forms (" + forms.size() + "):");
 
         for (int i = 0; i < displayed; i++) {
-            TokenNode form = best.get(i);
+            TokenNode form = forms.get(i);
             System.out.printf("  %d. %s [height=%d, width=%d]%n",
                     i + 1,
                     ExpressionFormatter.format(form),
@@ -91,8 +90,8 @@ public class ConsoleView {
                     TreeMetrics.width(form));
         }
 
-        if (best.size() > displayed)
-            System.out.println("  ... " + (best.size() - displayed)
+        if (forms.size() > displayed)
+            System.out.println("  ... " + (forms.size() - displayed)
                     + " more forms omitted (display limit: " + MAX_DISPLAYED_FORMS + ")");
 
         System.out.println();

@@ -3,6 +3,8 @@ package com.github.kol.oss.compiler.service;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.pipeline.TransformationResult;
+import com.github.kol.oss.compiler.utils.TreeMetrics;
+import com.github.kol.oss.compiler.utils.TreeWalker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -112,6 +114,36 @@ public class CommutativeServiceTest {
         assertTrue(result.forms().size() > 1);
         assertSame(result.tree(), result.forms().getFirst());
         assertEquivalent(result.forms());
+        assertFormsTie(result.forms());
+    }
+
+    @Test
+    public void givenTwoTerms_whenApplyCommutative_thenOnlySwappedFormReturned() {
+        TransformationResult result = applyCommutativeResult("a+b");
+
+        assertEquals("(a+b)", toKey(result.tree()));
+        assertEquals(1, result.forms().size());
+        assertEquals("(b+a)", toKey(result.forms().getFirst()));
+    }
+
+    @Test
+    public void givenSumOfFourTerms_whenApplyCommutative_thenEveryReturnedFormIsOptimal() {
+        TransformationResult result = applyCommutativeResult("a+b+c+d");
+
+        assertEquals(24, result.forms().size());
+        assertFormsTie(result.forms());
+        assertEquals(2, TreeMetrics.height(result.forms().getFirst()));
+        assertEquals(2, TreeMetrics.width(result.forms().getFirst()));
+    }
+
+    @Test
+    public void givenExpression_whenApplyCommutative_thenInputFormExcludedFromForms() {
+        TokenNode input = commutativeInput("a+b+c+d");
+        TransformationResult result = commutativeService.apply(input);
+        String inputKey = TreeWalker.structuralKey(input);
+
+        assertTrue(result.forms().stream()
+                .noneMatch(form -> TreeWalker.structuralKey(form).equals(inputKey)));
     }
 
     private TokenNode applyCommutative(String expression) {
@@ -119,13 +151,15 @@ public class CommutativeServiceTest {
     }
 
     private TransformationResult applyCommutativeResult(String expression) {
+        return commutativeService.apply(commutativeInput(expression));
+    }
+
+    private TokenNode commutativeInput(String expression) {
         List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
         TokenNode tree = treeBuildService.buildTree(tokens);
-        TransformationResult optimized = optimizationService.apply(tree);
-
-        return commutativeService.apply(optimized.tree());
+        return optimizationService.apply(tree).tree();
     }
 
     private void assertEquivalent(List<TokenNode> forms) {
@@ -140,5 +174,16 @@ public class CommutativeServiceTest {
 
         for (TokenNode form : forms)
             assertEquals(expected, evaluate(form, values), 1e-9);
+    }
+
+    // every returned form must share the same optimal height and width
+    private void assertFormsTie(List<TokenNode> forms) {
+        int height = TreeMetrics.height(forms.getFirst());
+        int width = TreeMetrics.width(forms.getFirst());
+
+        for (TokenNode form : forms) {
+            assertEquals(height, TreeMetrics.height(form), toKey(form));
+            assertEquals(width, TreeMetrics.width(form), toKey(form));
+        }
     }
 }
