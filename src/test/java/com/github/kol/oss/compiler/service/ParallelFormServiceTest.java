@@ -46,7 +46,7 @@ public class ParallelFormServiceTest {
         return Stream.of(
                 Arguments.of("a-b", "(a-b)"),
                 Arguments.of("a-b-c", "(a-(b+c))"),
-                Arguments.of("a-b-c-d", "(a-(b+(c+d)))"),
+                Arguments.of("a-b-c-d", "((a-b)-(c+d))"),
                 Arguments.of("a-b-c-d-e", "(a-((b+c)+(d+e)))")
         );
     }
@@ -55,7 +55,7 @@ public class ParallelFormServiceTest {
         return Stream.of(
                 Arguments.of("a/b", "(a/b)"),
                 Arguments.of("a/b/c", "(a/(b*c))"),
-                Arguments.of("a/b/c/d", "(a/(b*(c*d)))"),
+                Arguments.of("a/b/c/d", "((a/b)/(c*d))"),
                 Arguments.of("a/b/c/d/e", "(a/((b*c)*(d*e)))")
         );
     }

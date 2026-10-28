@@ -57,12 +57,14 @@ public class AssociativeService extends TreeTransformationService {
         Chain chain = ChainAssembler.assemble(operation, context.replacements());
 
         List<Term> grouped = groupFactors(chain.terms(), search);
-        TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), grouped));
 
+        // nothing was factored out: keep the incoming (already balanced) tree
+        if (grouped.size() >= chain.terms().size())
+            return;
+
+        TokenNode rebuilt = BalancedTreeBuilder.buildBalanced(new Chain(chain.family(), grouped));
         context.replace(operation, rebuilt);
-
-        if (grouped.size() < chain.terms().size())
-            context.record(operation, rebuilt);
+        context.record(operation, rebuilt);
     }
 
     private List<TokenNode> associativeCandidates(OperationNode operation) {
@@ -81,14 +83,21 @@ public class AssociativeService extends TreeTransformationService {
             if (terms.size() >= originalSize)
                 continue;
 
-            TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), terms));
-            forms.putIfAbsent(TreeWalker.structuralKey(rebuilt), rebuilt);
+            Chain rebuiltChain = new Chain(chain.family(), terms);
+
+            // keep both sign-aware and sign-grouped builds so no tied form is lost
+            addForm(forms, BalancedTreeBuilder.buildBalanced(rebuiltChain));
+            addForm(forms, BalancedTreeBuilder.buildSigned(rebuiltChain));
 
             if (forms.size() >= VARIANT_LIMIT)
                 break;
         }
 
         return List.copyOf(forms.values());
+    }
+
+    private void addForm(Map<String, TokenNode> forms, TokenNode form) {
+        forms.putIfAbsent(TreeWalker.structuralKey(form), form);
     }
 
     // find best grouping
@@ -170,7 +179,7 @@ public class AssociativeService extends TreeTransformationService {
         List<List<Term>> variants = new ArrayList<>();
 
         for (List<Term> innerVariant : groupVariants(inner, search)) {
-            TokenNode innerSum = BalancedTreeBuilder.buildSigned(new Chain(OperatorValue.PLUS, innerVariant));
+            TokenNode innerSum = BalancedTreeBuilder.buildBalanced(new Chain(OperatorValue.PLUS, innerVariant));
             TokenNode groupNode = grouping.factor().sign() == TermSign.POSITIVE
                     ? NodeFactory.operation(OperatorValue.MULTIPLY, grouping.factor().node(), innerSum)
                     : NodeFactory.operation(OperatorValue.DIVISION, innerSum, grouping.factor().node());
@@ -252,7 +261,7 @@ public class AssociativeService extends TreeTransformationService {
         inner = groupFactors(inner, search);
 
         // build group
-        TokenNode innerSum = BalancedTreeBuilder.buildSigned(new Chain(OperatorValue.PLUS, inner));
+        TokenNode innerSum = BalancedTreeBuilder.buildBalanced(new Chain(OperatorValue.PLUS, inner));
         TokenNode groupNode = grouping.factor().sign() == TermSign.POSITIVE
                 ? NodeFactory.operation(OperatorValue.MULTIPLY, grouping.factor().node(), innerSum)
                 : NodeFactory.operation(OperatorValue.DIVISION, innerSum, grouping.factor().node());
@@ -304,7 +313,7 @@ public class AssociativeService extends TreeTransformationService {
                 .map(factor -> new Term(factor.node(), factor.sign()))
                 .toList();
 
-        return BalancedTreeBuilder.buildSigned(new Chain(OperatorValue.MULTIPLY, terms));
+        return BalancedTreeBuilder.buildBalanced(new Chain(OperatorValue.MULTIPLY, terms));
     }
 
     // insert group into list

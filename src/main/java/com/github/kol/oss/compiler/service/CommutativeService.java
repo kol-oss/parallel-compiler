@@ -72,8 +72,9 @@ public class CommutativeService extends TreeTransformationService {
         List<Term> reordered = new ArrayList<>(sortedPositives);
         reordered.addAll(sortedNegatives);
 
-        // rebuild
-        TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), reordered));
+        // rebuild: buildBalanced keeps the sign-aware grouping, so a mixed
+        // addition/subtraction chain does not lose a level at the root
+        TokenNode rebuilt = BalancedTreeBuilder.buildBalanced(new Chain(chain.family(), reordered));
         context.replace(operation, rebuilt);
 
         if (orderChanged || !TreeWalker.same(operation, rebuilt))
@@ -86,7 +87,7 @@ public class CommutativeService extends TreeTransformationService {
         List<Term> terms = chain.family() == OperatorValue.PLUS ? dropZeros(chain.terms()) : chain.terms();
 
         if (terms.size() < 2)
-            return List.of(BalancedTreeBuilder.buildSigned(new Chain(chain.family(), terms)));
+            return List.of(BalancedTreeBuilder.buildBalanced(new Chain(chain.family(), terms)));
 
         Map<String, TokenNode> forms = new LinkedHashMap<>();
         addCandidate(forms, chain, canonicalOrder(terms));
@@ -155,8 +156,16 @@ public class CommutativeService extends TreeTransformationService {
     }
 
     private void addCandidate(Map<String, TokenNode> forms, Chain chain, List<Term> ordered) {
-        TokenNode rebuilt = BalancedTreeBuilder.buildSigned(new Chain(chain.family(), ordered));
-        forms.putIfAbsent(TreeWalker.structuralKey(rebuilt), rebuilt);
+        Chain reordered = new Chain(chain.family(), ordered);
+
+        // buildBalanced picks one of buildSigned / buildBalancedSigned; keep both so
+        // the selector can compare every tied form instead of silently dropping one
+        addForm(forms, BalancedTreeBuilder.buildBalanced(reordered));
+        addForm(forms, BalancedTreeBuilder.buildSigned(reordered));
+    }
+
+    private void addForm(Map<String, TokenNode> forms, TokenNode form) {
+        forms.putIfAbsent(TreeWalker.structuralKey(form), form);
     }
 
     // filter by sign

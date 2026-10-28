@@ -137,6 +137,23 @@ public class CommutativeServiceTest {
     }
 
     @Test
+    public void givenK4_whenApplyCommutative_thenFormsReachMinimalHeightAndMaximalWidth() {
+        String expression = "a + b*c + d + e*f*g + h*i + j*(k + L + m*(n - p*q + r) - s*t)";
+        String ideal = "j * (m * ((n + r) - p * q) + ((k + L) - s * t)) + (((a + d) + b * c) + (e * (f * g) + h * i))";
+
+        TransformationResult result = applyCommutativeResult(expression);
+        TokenNode idealTree = parseExpression(ideal);
+
+        assertEquals(6, TreeMetrics.height(result.tree()));
+        assertEquals(6, TreeMetrics.width(result.tree()));
+        assertFormsTie(result.forms());
+        assertEquals(6, TreeMetrics.height(result.forms().getFirst()));
+        assertEquals(6, TreeMetrics.width(result.forms().getFirst()));
+        assertTrue(result.forms().stream()
+                .anyMatch(form -> TreeWalker.structuralKey(form).equals(TreeWalker.structuralKey(idealTree))));
+    }
+
+    @Test
     public void givenExpression_whenApplyCommutative_thenInputFormExcludedFromForms() {
         TokenNode input = commutativeInput("a+b+c+d");
         TransformationResult result = commutativeService.apply(input);
@@ -155,11 +172,14 @@ public class CommutativeServiceTest {
     }
 
     private TokenNode commutativeInput(String expression) {
+        return optimizationService.apply(parseExpression(expression)).tree();
+    }
+
+    private TokenNode parseExpression(String expression) {
         List<Token> tokens = lexicalAnalysisService.tokenize(expression).tokens();
         syntaxValidationService.validate(tokens);
 
-        TokenNode tree = treeBuildService.buildTree(tokens);
-        return optimizationService.apply(tree).tree();
+        return treeBuildService.buildTree(tokens);
     }
 
     private void assertEquivalent(List<TokenNode> forms) {

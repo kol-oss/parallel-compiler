@@ -68,9 +68,9 @@ public class AssociativeServiceTest {
     private static Stream<Arguments> provideClosedParenthesesCases() {
         return Stream.of(
                 Arguments.of("a-b*k+b*t-f*f*5.9+f*q+g*f*5.9-g*q-f/(d+q-w)-g/(d+q-w)",
-                        "((((g-f)*((5.9*f)-q))+((b*(t-k))+a))-((f+g)/((d+q)-w)))"),
+                        "((((g-f)*((5.9*f)-q))+(b*(t-k)))+(a-((f+g)/((d+q)-w))))"),
                 Arguments.of("a-b*k+b*t-b*f*f*5.9+b*f*q+b*g*f*5.9-b*g*q-b*w/p+b*y*m/p-b*y/p-x*x/(d+q-w)+3*x/(d+q-w)+3*x/(d+q-w)+3*3/(d+q-w)",
-                        "((((x*((3+3)-x))+9)/((d+q)-w))+((b*(((((f*5.9)-q)*(g-f))+((((y*(m-1))-w)/p)+t))-k))+a))")
+                        "((((x*((3+3)-x))+9)/((d+q)-w))+((b*((((f*5.9)-q)*(g-f))+((((y*(m-1))-w)/p)+(t-k))))+a))")
         );
     }
 
@@ -166,6 +166,18 @@ public class AssociativeServiceTest {
         assertEquals(2, TreeMetrics.width(result.forms().getFirst()));
         assertTrue(result.forms().stream()
                 .noneMatch(form -> TreeWalker.structuralKey(form).equals(TreeWalker.structuralKey(input))));
+    }
+
+    @Test
+    public void givenK4CommutativeOutput_whenApplyAssociative_thenBalancedHeightIsPreserved() {
+        TokenNode input = associativeInput("a + b*c + d + e*f*g + h*i + j*(k + L + m*(n - p*q + r) - s*t)");
+        TransformationResult result = associativeService.apply(input);
+
+        assertEquals(6, TreeMetrics.height(input));
+        assertEquals(6, TreeMetrics.width(input));
+        assertEquals(6, TreeMetrics.height(result.tree()));
+        assertEquals(6, TreeMetrics.width(result.tree()));
+        assertEquals(0, result.forms().size());
     }
 
     private TransformationResult applyAssociative(String expression) {
