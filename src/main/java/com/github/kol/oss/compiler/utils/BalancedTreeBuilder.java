@@ -13,6 +13,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.function.IntUnaryOperator;
 
 public class BalancedTreeBuilder {
     private record MergeTask(int start, int end, boolean combine) {
@@ -90,7 +91,7 @@ public class BalancedTreeBuilder {
                 continue;
             }
 
-            int split = bestSplit(terms, start, end);
+            int split = bestSplit(start, end, index -> terms.get(index).getWeight());
             tasks.push(new MergeTask(start, end, true));
             tasks.push(new MergeTask(split, end, false));
             tasks.push(new MergeTask(start, split, false));
@@ -131,7 +132,7 @@ public class BalancedTreeBuilder {
                 continue;
             }
 
-            int split = bestTermSplit(terms, task.start(), task.end());
+            int split = bestSplit(task.start(), task.end(), index -> terms.get(index).node().getWeight());
             OperatorValue operator = terms.get(split).sign() == task.multiplier() ? positive : negative;
             tasks.push(new SignedTask(task.start(), task.end(), task.multiplier(), true, operator));
             tasks.push(new SignedTask(split, task.end(), terms.get(split).sign(), false, null));
@@ -141,42 +142,17 @@ public class BalancedTreeBuilder {
         return merged.pop();
     }
 
-    private static int bestTermSplit(List<Term> terms, int start, int end) {
+    private static int bestSplit(int start, int end, IntUnaryOperator weightAt) {
         int total = 0;
         for (int i = start; i < end; i++)
-            total += terms.get(i).node().getWeight();
+            total += weightAt.applyAsInt(i);
 
         int best = start + 1;
         long bestDifference = Long.MAX_VALUE;
         int prefix = 0;
 
         for (int k = start + 1; k < end; k++) {
-            prefix += terms.get(k - 1).node().getWeight();
-
-            long left = prefix + (k - start - 1);
-            long right = (total - prefix) + (end - k - 1);
-            long difference = Math.abs(left - right);
-
-            if (difference < bestDifference) {
-                bestDifference = difference;
-                best = k;
-            }
-        }
-
-        return best;
-    }
-
-    private static int bestSplit(List<TokenNode> terms, int start, int end) {
-        int total = 0;
-        for (int i = start; i < end; i++)
-            total += terms.get(i).getWeight();
-
-        int best = start + 1;
-        long bestDifference = Long.MAX_VALUE;
-        int prefix = 0;
-
-        for (int k = start + 1; k < end; k++) {
-            prefix += terms.get(k - 1).getWeight();
+            prefix += weightAt.applyAsInt(k - 1);
 
             long left = prefix + (k - start - 1);
             long right = (total - prefix) + (end - k - 1);

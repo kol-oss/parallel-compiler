@@ -1,33 +1,21 @@
 package com.github.kol.oss.compiler.service;
 
-import com.github.kol.oss.compiler.constant.NumberConstant;
 import com.github.kol.oss.compiler.constant.OperatorValue;
-import com.github.kol.oss.compiler.constant.TermSign;
-import com.github.kol.oss.compiler.constant.TokenType;
+import com.github.kol.oss.compiler.constant.SearchLimits;
 import com.github.kol.oss.compiler.dto.chain.Chain;
 import com.github.kol.oss.compiler.dto.chain.Term;
-import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
-import com.github.kol.oss.compiler.dto.node.ValueNode;
-import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.pipeline.TransformationService;
 import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
 import com.github.kol.oss.compiler.utils.*;
 
-import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 public class AssociativeService extends TreeTransformationService {
-    private static final int SEARCH_BUDGET = 200_000;
-    private static final int VARIANT_LIMIT = 20_000;
-    private static final int VARIANT_SEARCH_BUDGET = 1_000_000;
-    private static final int MAX_TREE_VARIANTS = 50_000;
-    private static final int MAX_EQUIVALENT_FORMS = 500;
-    // a factor shared by many terms can be taken out of any subset of them, not only
-    // out of all of them, so subset grouping is enumerated up to this bound
-    private static final int MAX_GROUPINGS_PER_FACTOR = 128;
-
     @Override
     public String name() {
         return TransformationService.ASSOCIATIVE;
@@ -49,35 +37,32 @@ public class AssociativeService extends TreeTransformationService {
                 original,
                 roots,
                 this::associativeCandidates,
-                MAX_TREE_VARIANTS
+                SearchLimits.MAX_TREE_VARIANTS
         );
 
         return rankedForms(original, transformed, candidates);
     }
 
-    // the incoming form is ranked together with the generated ones and stays in the set
-    // as long as it fits into the form limit
     private List<TokenNode> rankedForms(TokenNode original, TokenNode transformed, List<TokenNode> candidates) {
-        List<TokenNode> forms = new ArrayList<>(mergeForms(transformed, candidates));
+        TreeFormCollector forms = new TreeFormCollector();
+        forms.add(transformed);
+        forms.addAll(candidates);
         forms.add(original);
 
-        // the incoming form is part of the equivalent set even when the ranking limit
-        // would otherwise cut it; without it lab 6 loses one of the available trees
         Set<String> mandatory = new LinkedHashSet<>();
         mandatory.add(TreeWalker.structuralKey(original));
         mandatory.add(TreeWalker.structuralKey(transformed));
 
-        return TreeFormSelector.selectRanked(forms, MAX_EQUIVALENT_FORMS, mandatory);
+        return TreeFormSelector.selectRanked(forms.forms(), SearchLimits.MAX_EQUIVALENT_FORMS, mandatory);
     }
 
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
-        SearchContext search = new SearchContext();
-        Chain chain = ChainAssembler.assemble(operation, context.replacements());
+        AssociativeSearch search = new AssociativeSearch();
+        Chain chain = ChainAssembler.assemble(operation, context::resolve);
 
-        List<Term> grouped = groupFactors(chain.terms(), search);
+        List<Term> grouped = search.bestGrouping(chain.terms());
 
-        // nothing was factored out: keep the incoming (already balanced) tree
         if (grouped.size() >= chain.terms().size())
             return;
 
@@ -87,523 +72,32 @@ public class AssociativeService extends TreeTransformationService {
     }
 
     private List<TokenNode> associativeCandidates(OperationNode operation) {
-        Chain chain = ChainAssembler.assemble(operation, Map.of());
+        Chain chain = ChainAssembler.assemble(operation);
 
         if (chain.family() != OperatorValue.PLUS)
             return List.of(operation);
 
-        SearchContext search = new SearchContext();
+        List<List<Term>> variants = new ArrayList<>(
+                new AssociativeSearch().variants(chain.terms(), false)
+        );
+        variants.addAll(new AssociativeSearch().variants(chain.terms(), true));
 
-        // full-grouping variants are generated first so the complete factorings are
-        // always present; partial (subset) factorings are added on top of them and get
-        // a separate search budget so they cannot starve the complete factorings
-        List<List<Term>> variants = new ArrayList<>(groupVariants(chain.terms(), search, false));
-        variants.addAll(groupVariants(chain.terms(), new SearchContext(), true));
-
-        Map<String, TokenNode> forms = new LinkedHashMap<>();
+        TreeFormCollector forms = new TreeFormCollector();
         int originalSize = chain.terms().size();
 
         for (List<Term> terms : variants) {
-            // only variants where at least one common factor was actually taken out
             if (terms.size() >= originalSize)
                 continue;
 
             Chain rebuiltChain = new Chain(chain.family(), terms);
 
-            // keep both sign-aware and sign-grouped builds so no tied form is lost
-            addForm(forms, BalancedTreeBuilder.buildBalanced(rebuiltChain));
-            addForm(forms, BalancedTreeBuilder.buildSigned(rebuiltChain));
+            forms.add(BalancedTreeBuilder.buildBalanced(rebuiltChain));
+            forms.add(BalancedTreeBuilder.buildSigned(rebuiltChain));
 
-            if (forms.size() >= VARIANT_LIMIT)
+            if (forms.size() >= SearchLimits.ASSOCIATIVE_VARIANT_LIMIT)
                 break;
         }
 
-        return List.copyOf(forms.values());
-    }
-
-    private void addForm(Map<String, TokenNode> forms, TokenNode form) {
-        forms.putIfAbsent(TreeWalker.structuralKey(form), form);
-    }
-
-    // find best grouping
-    private List<Term> groupFactors(List<Term> terms, SearchContext search) {
-        String state = signature(terms, search);
-        List<Term> cached = search.memo.get(state);
-
-        if (cached != null)
-            return cached;
-
-        if (--search.budget <= 0)
-            return terms;
-
-        List<Term> best = terms;
-        int bestCost = cost(terms);
-
-        // try groupings; the primary transformation keeps the original full-subset
-        // strategy so its choice does not depend on the extra variant enumeration
-        for (Grouping grouping : options(terms, search, false)) {
-            List<Term> candidate = groupFactors(applyGrouping(terms, grouping, search), search);
-            int candidateCost = cost(candidate);
-
-            if (candidateCost < bestCost) {
-                best = candidate;
-                bestCost = candidateCost;
-            }
-        }
-
-        search.memo.put(state, best);
-        return best;
-    }
-
-    // find all distinct groupings within the search budget
-    private List<List<Term>> groupVariants(List<Term> terms, SearchContext search, boolean includeSubsets) {
-        String state = orderedSignature(terms, search);
-        Map<String, List<List<Term>>> memo = includeSubsets ? search.subsetVariantMemo : search.variantMemo;
-        List<List<Term>> cached = memo.get(state);
-        if (cached != null)
-            return cached;
-
-        if (--search.variantBudget <= 0)
-            return List.of(terms);
-
-        Map<String, List<Term>> results = new LinkedHashMap<>();
-        results.put(state, terms);
-
-        for (Grouping grouping : options(terms, search, includeSubsets)) {
-            for (List<Term> grouped : applyGroupingVariants(terms, grouping, search, includeSubsets)) {
-                results.putIfAbsent(orderedSignature(grouped, search), grouped);
-
-                for (List<Term> further : groupVariants(grouped, search, includeSubsets)) {
-                    results.putIfAbsent(orderedSignature(further, search), further);
-
-                    if (results.size() >= VARIANT_LIMIT)
-                        break;
-                }
-
-                if (results.size() >= VARIANT_LIMIT)
-                    break;
-            }
-
-            if (results.size() >= VARIANT_LIMIT)
-                break;
-        }
-
-        List<List<Term>> variants = List.copyOf(results.values());
-        memo.put(state, variants);
-        return variants;
-    }
-
-    private List<List<Term>> applyGroupingVariants(List<Term> terms, Grouping grouping, SearchContext search, boolean includeSubsets) {
-        List<Term> remainders = new ArrayList<>();
-        for (int index : grouping.indexes())
-            remainders.add(remainderTerm(terms.get(index), factorsOf(terms.get(index).node(), search), grouping.factor()));
-
-        // handle signs
-        boolean allNegative = remainders.stream().allMatch(term -> term.sign() == TermSign.NEGATIVE);
-        TermSign groupSign = allNegative ? TermSign.NEGATIVE : TermSign.POSITIVE;
-        List<Term> inner = allNegative ? flipped(remainders) : remainders;
-
-        List<List<Term>> variants = new ArrayList<>();
-
-        for (List<Term> innerVariant : groupVariants(inner, search, includeSubsets)) {
-            TokenNode innerSum = BalancedTreeBuilder.buildBalanced(new Chain(OperatorValue.PLUS, innerVariant));
-            TokenNode groupNode = grouping.factor().sign() == TermSign.POSITIVE
-                    ? NodeFactory.operation(OperatorValue.MULTIPLY, grouping.factor().node(), innerSum)
-                    : NodeFactory.operation(OperatorValue.DIVISION, innerSum, grouping.factor().node());
-
-            variants.add(insertGroup(terms, grouping.indexes(), new Term(groupNode, groupSign)));
-
-            if (variants.size() >= VARIANT_LIMIT)
-                break;
-        }
-
-        return variants;
-    }
-
-    private String orderedSignature(List<Term> terms, SearchContext search) {
-        List<String> keys = new ArrayList<>(terms.size());
-
-        for (Term term : terms)
-            keys.add((term.sign() == TermSign.POSITIVE ? "+" : "-") + key(term.node(), search));
-
-        return String.join(";", keys);
-    }
-
-    private List<Grouping> options(List<Term> terms, SearchContext search, boolean includeSubsets) {
-        // get factors per term
-        List<List<Factor>> termFactors = new ArrayList<>();
-        for (Term term : terms)
-            termFactors.add(factorsOf(term.node(), search));
-
-        List<Grouping> result = new ArrayList<>();
-        List<Grouping> partial = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-
-        for (List<Factor> factors : termFactors) {
-            for (Factor candidate : factors) {
-                // skip seen
-                if (!seen.add(candidate.sign() + "|" + candidate.norm()))
-                    continue;
-
-                // find matches
-                List<Integer> indexes = matchingIndexes(termFactors, candidate);
-                if (indexes.size() < 2)
-                    continue;
-
-                if (!allNeutral(terms, termFactors, indexes, candidate, search))
-                    result.add(new Grouping(indexes, candidate));
-
-                if (!includeSubsets)
-                    continue;
-
-                // a common factor can also be taken out of any proper subset of matching
-                // terms; all full groups are emitted first so complete factorings keep
-                // the same enumeration order and stay inside the search budget
-                for (List<Integer> group : indexGroups(indexes)) {
-                    if (group.size() == indexes.size())
-                        continue;
-
-                    if (!allNeutral(terms, termFactors, group, candidate, search))
-                        partial.add(new Grouping(group, candidate));
-                }
-            }
-        }
-
-        result.addAll(partial);
-        return result;
-    }
-
-    private List<List<Integer>> indexGroups(List<Integer> indexes) {
-        List<List<Integer>> groups = new ArrayList<>();
-        if (indexes.size() < 2)
-            return groups;
-
-        for (int size = indexes.size(); size >= 2 && groups.size() < MAX_GROUPINGS_PER_FACTOR; size--)
-            collectIndexGroups(indexes, size, 0, new ArrayList<>(), groups);
-
-        return groups;
-    }
-
-    private void collectIndexGroups(
-            List<Integer> indexes,
-            int size,
-            int start,
-            List<Integer> current,
-            List<List<Integer>> groups
-    ) {
-        if (groups.size() >= MAX_GROUPINGS_PER_FACTOR)
-            return;
-
-        if (current.size() == size) {
-            groups.add(List.copyOf(current));
-            return;
-        }
-
-        int remaining = size - current.size();
-        for (int i = start; i <= indexes.size() - remaining; i++) {
-            current.add(indexes.get(i));
-            collectIndexGroups(indexes, size, i + 1, current, groups);
-            current.removeLast();
-
-            if (groups.size() >= MAX_GROUPINGS_PER_FACTOR)
-                return;
-        }
-    }
-
-    // find matching term indexes
-    private List<Integer> matchingIndexes(List<List<Factor>> termFactors, Factor candidate) {
-        List<Integer> indexes = new ArrayList<>();
-
-        for (int i = 0; i < termFactors.size(); i++) {
-            if (termFactors.get(i).stream().anyMatch(factor -> provides(factor, candidate)))
-                indexes.add(i);
-        }
-
-        return indexes;
-    }
-
-    // check if grouping is neutral
-    private boolean allNeutral(List<Term> terms, List<List<Factor>> termFactors, List<Integer> indexes, Factor candidate, SearchContext search) {
-        return indexes.stream().allMatch(index -> {
-            Term remainder = remainderTerm(terms.get(index), termFactors.get(index), candidate);
-            return isUnit(remainder) || key(remainder.node(), search).equals(key(terms.get(index).node(), search));
-        });
-    }
-
-    private List<Term> applyGrouping(List<Term> terms, Grouping grouping, SearchContext search) {
-        List<Term> remainders = new ArrayList<>();
-        for (int index : grouping.indexes())
-            remainders.add(remainderTerm(terms.get(index), factorsOf(terms.get(index).node(), search), grouping.factor()));
-
-        // handle signs
-        boolean allNegative = remainders.stream().allMatch(term -> term.sign() == TermSign.NEGATIVE);
-        TermSign groupSign = allNegative ? TermSign.NEGATIVE : TermSign.POSITIVE;
-        List<Term> inner = allNegative ? flipped(remainders) : remainders;
-
-        // factorize inner
-        inner = groupFactors(inner, search);
-
-        // build group
-        TokenNode innerSum = BalancedTreeBuilder.buildBalanced(new Chain(OperatorValue.PLUS, inner));
-        TokenNode groupNode = grouping.factor().sign() == TermSign.POSITIVE
-                ? NodeFactory.operation(OperatorValue.MULTIPLY, grouping.factor().node(), innerSum)
-                : NodeFactory.operation(OperatorValue.DIVISION, innerSum, grouping.factor().node());
-
-        return insertGroup(terms, grouping.indexes(), new Term(groupNode, groupSign));
-    }
-
-    private Term remainderTerm(Term term, List<Factor> factors, Factor target) {
-        List<Factor> remaining = new ArrayList<>();
-        TermSign sign = term.sign();
-        boolean removed = false;
-
-        for (Factor factor : factors) {
-            if (!removed && provides(factor, target)) {
-                if (opposite(factor, target))
-                    sign = flip(sign);
-
-                removed = true;
-                continue;
-            }
-
-            remaining.add(factor);
-        }
-
-        return new Term(buildRemainder(remaining), sign);
-    }
-
-    private boolean provides(Factor factor, Factor candidate) {
-        return equivalent(factor, candidate) || opposite(factor, candidate);
-    }
-
-    private boolean equivalent(Factor factor, Factor candidate) {
-        return factor.sign() == candidate.sign() && factor.norm().equals(candidate.norm());
-    }
-
-    private boolean opposite(Factor factor, Factor candidate) {
-        if (factor.sign() != candidate.sign())
-            return false;
-
-        return candidate.flip() != null && factor.norm().equals(candidate.flip())
-                || factor.flip() != null && candidate.norm().equals(factor.flip());
-    }
-
-    private TokenNode buildRemainder(List<Factor> factors) {
-        if (factors.isEmpty())
-            return NodeFactory.value(oneToken());
-
-        List<Term> terms = factors.stream()
-                .map(factor -> new Term(factor.node(), factor.sign()))
-                .toList();
-
-        return BalancedTreeBuilder.buildBalanced(new Chain(OperatorValue.MULTIPLY, terms));
-    }
-
-    // insert group into list
-    private List<Term> insertGroup(List<Term> terms, List<Integer> indexes, Term group) {
-        boolean[] consumed = new boolean[terms.size()];
-        for (int index : indexes)
-            consumed[index] = true;
-
-        List<Term> result = new ArrayList<>();
-        boolean inserted = false;
-
-        for (int i = 0; i < terms.size(); i++) {
-            if (i == indexes.getFirst() && !inserted) {
-                inserted = true;
-                result.add(group);
-            }
-
-            if (!consumed[i])
-                result.add(terms.get(i));
-        }
-
-        return result;
-    }
-
-    // flip all terms to positive
-    private List<Term> flipped(List<Term> terms) {
-        return terms.stream().map(term -> new Term(term.node(), TermSign.POSITIVE)).toList();
-    }
-
-    private boolean isUnit(Term term) {
-        return term.node() instanceof ValueNode value && ArithmeticUtils.isOne(value.getToken());
-    }
-
-    private TermSign flip(TermSign sign) {
-        return sign == TermSign.POSITIVE ? TermSign.NEGATIVE : TermSign.POSITIVE;
-    }
-
-    // get factors of node
-    private List<Factor> factorsOf(TokenNode node, SearchContext search) {
-        List<Factor> cached = search.factors.get(node);
-        if (cached != null)
-            return cached;
-
-        List<Factor> factors;
-        if (TreeWalker.chainFamily(node) != OperatorValue.MULTIPLY) {
-            factors = List.of(factorOf(node, TermSign.POSITIVE, search));
-        } else {
-            factors = ChainAssembler.assemble(node, Map.of()).terms().stream()
-                    .map(term -> factorOf(term.node(), term.sign(), search))
-                    .toList();
-        }
-
-        search.factors.put(node, factors);
-        return factors;
-    }
-
-    private Factor factorOf(TokenNode node, TermSign sign, SearchContext search) {
-        Keys keys = keysOf(node, search);
-        return new Factor(node, sign, keys.norm(), keys.flip());
-    }
-
-    private int cost(List<Term> terms) {
-        int cost = 0;
-        int positives = 0;
-        int negatives = 0;
-
-        for (Term term : terms) {
-            cost += term.node().getWeight();
-
-            if (term.sign() == TermSign.POSITIVE)
-                positives++;
-            else
-                negatives++;
-        }
-
-        if (positives > 1)
-            cost += positives - 1;
-
-        if (negatives > 1)
-            cost += negatives - 1;
-
-        if (negatives > 0)
-            cost += 1;
-
-        return cost;
-    }
-
-    private String signature(List<Term> terms, SearchContext search) {
-        List<String> keys = new ArrayList<>();
-
-        for (Term term : terms)
-            keys.add((term.sign() == TermSign.POSITIVE ? "+" : "-") + key(term.node(), search));
-
-        Collections.sort(keys);
-        return String.join(";", keys);
-    }
-
-    private Keys keysOf(TokenNode node, SearchContext search) {
-        Keys cached = search.keys.get(node);
-        if (cached != null)
-            return cached;
-
-        Keys keys = new Keys(computeKey(node, search), flipKey(node, search));
-        search.keys.put(node, keys);
-        return keys;
-    }
-
-    private String key(TokenNode node, SearchContext search) {
-        return keysOf(node, search).norm();
-    }
-
-    private String computeKey(TokenNode node, SearchContext search) {
-        OperatorValue family = TreeWalker.chainFamily(node);
-
-        if (family == OperatorValue.PLUS)
-            return sumKey(node, false, search);
-
-        if (family == OperatorValue.MULTIPLY)
-            return productKey(node, search);
-
-        if (node instanceof FunctionNode function) {
-            StringBuilder builder = new StringBuilder(function.getToken().value()).append('(');
-
-            for (int i = 0; i < function.getArguments().size(); i++) {
-                if (i > 0)
-                    builder.append(',');
-
-                builder.append(key(function.getArguments().get(i), search));
-            }
-
-            return builder.append(')').toString();
-        }
-
-        if (node instanceof OperationNode operation)
-            return "(" + key(operation.getLeft(), search) + operation.getToken().value() + key(operation.getRight(), search) + ")";
-
-        if (node instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken()))
-            return valueKey(value.getToken());
-
-        return node.getToken().value();
-    }
-
-    private String flipKey(TokenNode node, SearchContext search) {
-        if (TreeWalker.chainFamily(node) == OperatorValue.PLUS)
-            return sumKey(node, true, search);
-
-        if (node instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken()))
-            return valueKey(negated(value.getToken()));
-
-        return null;
-    }
-
-    private String sumKey(TokenNode node, boolean invert, SearchContext search) {
-        List<String> keys = new ArrayList<>();
-
-        for (Term term : ChainAssembler.assemble(node, Map.of()).terms()) {
-            boolean negative = term.sign() == TermSign.POSITIVE;
-
-            if (invert)
-                negative = !negative;
-
-            keys.add((negative ? "-" : "+") + key(term.node(), search));
-        }
-
-        Collections.sort(keys);
-        return "{" + String.join(",", keys) + "}";
-    }
-
-    private String productKey(TokenNode node, SearchContext search) {
-        List<String> keys = new ArrayList<>();
-
-        for (Term term : ChainAssembler.assemble(node, Map.of()).terms())
-            keys.add((term.sign() == TermSign.POSITIVE ? "+" : "-") + key(term.node(), search));
-
-        Collections.sort(keys);
-        return "(" + String.join(",", keys) + ")";
-    }
-
-    private String valueKey(Token token) {
-        return "#" + new BigDecimal(token.value()).stripTrailingZeros().toPlainString();
-    }
-
-    private Token negated(Token token) {
-        return new Token(new BigDecimal(token.value()).negate().stripTrailingZeros().toPlainString(),
-                token.type(), token.position());
-    }
-
-    private Token oneToken() {
-        return new Token(NumberConstant.ONE, TokenType.INTEGER, 0);
-    }
-
-    private record Factor(TokenNode node, TermSign sign, String norm, String flip) {
-    }
-
-    private record Grouping(List<Integer> indexes, Factor factor) {
-    }
-
-    private record Keys(String norm, String flip) {
-    }
-
-    private static final class SearchContext {
-        private final Map<String, List<Term>> memo = new HashMap<>();
-        private final Map<String, List<List<Term>>> variantMemo = new HashMap<>();
-        private final Map<String, List<List<Term>>> subsetVariantMemo = new HashMap<>();
-        private final Map<TokenNode, Keys> keys = new WeakHashMap<>();
-        private final Map<TokenNode, List<Factor>> factors = new WeakHashMap<>();
-        private int budget = SEARCH_BUDGET;
-        private int variantBudget = VARIANT_SEARCH_BUDGET;
+        return forms.forms();
     }
 }

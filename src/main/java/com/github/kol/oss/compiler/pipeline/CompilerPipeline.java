@@ -23,8 +23,6 @@ public class CompilerPipeline {
             if (!result.diagnostics().isEmpty())
                 break;
 
-            // every service keeps its primary form in tree(); the pipeline continues with it,
-            // while the ranked equivalent forms stay available for later selection
             current = result.tree();
         }
 

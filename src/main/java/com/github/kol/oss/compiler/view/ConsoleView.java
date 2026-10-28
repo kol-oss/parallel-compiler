@@ -76,7 +76,7 @@ public class ConsoleView {
     }
 
     public void printEquivalentForms(List<TokenNode> forms) {
-        // commutative forms are optimal (min height, max width), associative forms are ranked best first
+
         int displayed = Math.min(forms.size(), MAX_DISPLAYED_FORMS);
 
         System.out.println("Equivalent forms (" + forms.size() + "):");

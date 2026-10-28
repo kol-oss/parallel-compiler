@@ -12,15 +12,11 @@ import java.util.List;
 
 public class NodeFactory {
     public static ValueNode value(Token token) {
-        ValueNode node = new ValueNode(token);
-        node.setWeight(0);
-        return node;
+        return new ValueNode(token);
     }
 
     public static OperationNode operation(Token token, TokenNode left, TokenNode right) {
-        OperationNode node = new OperationNode(token, left, right);
-        node.setWeight(1 + left.getWeight() + right.getWeight());
-        return node;
+        return new OperationNode(token, left, right);
     }
 
     public static OperationNode operation(OperatorValue operator, TokenNode left, TokenNode right) {
@@ -28,8 +24,6 @@ public class NodeFactory {
     }
 
     public static FunctionNode function(Token token, List<TokenNode> arguments) {
-        FunctionNode node = new FunctionNode(token, arguments);
-        node.setWeight(1 + arguments.stream().mapToInt(TokenNode::getWeight).sum());
-        return node;
+        return new FunctionNode(token, arguments);
     }
 }

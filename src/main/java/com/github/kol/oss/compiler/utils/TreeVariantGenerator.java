@@ -5,15 +5,15 @@ import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-// builds tree variants by combining chain rewrites in nested expressions
 public final class TreeVariantGenerator {
     private final Set<TokenNode> chainRoots;
     private final Function<OperationNode, List<TokenNode>> rewriter;
@@ -36,28 +36,51 @@ public final class TreeVariantGenerator {
             Function<OperationNode, List<TokenNode>> rewriter,
             int limit
     ) {
-        return new TreeVariantGenerator(chainRoots, rewriter, limit).visit(root);
+        return new TreeVariantGenerator(chainRoots, rewriter, limit).visitAll(root);
     }
 
-    private List<TokenNode> visit(TokenNode node) {
-        List<TokenNode> cached = memo.get(node);
-        if (cached != null)
-            return cached;
+    private List<TokenNode> visitAll(TokenNode root) {
+        Deque<VisitFrame> pending = new ArrayDeque<>();
+        pending.push(new VisitFrame(root, false));
 
-        List<TokenNode> variants = distinct(switch (node) {
+        while (!pending.isEmpty()) {
+            VisitFrame frame = pending.pop();
+            TokenNode node = frame.node();
+
+            if (memo.containsKey(node))
+                continue;
+
+            if (frame.expanded()) {
+                memo.put(node, compute(node));
+                continue;
+            }
+
+            pending.push(new VisitFrame(node, true));
+
+            List<TokenNode> children = TreeWalker.children(node);
+            for (int i = children.size() - 1; i >= 0; i--) {
+                TokenNode child = children.get(i);
+
+                if (!memo.containsKey(child))
+                    pending.push(new VisitFrame(child, false));
+            }
+        }
+
+        return memo.get(root);
+    }
+
+    private List<TokenNode> compute(TokenNode node) {
+        return distinct(switch (node) {
             case FunctionNode function -> functionVariants(function);
             case OperationNode operation -> operationVariants(operation);
             default -> List.of(node);
         });
-
-        memo.put(node, variants);
-        return variants;
     }
 
     private List<TokenNode> functionVariants(FunctionNode function) {
         List<List<TokenNode>> argumentVariants = new ArrayList<>();
         for (TokenNode argument : function.getArguments())
-            argumentVariants.add(visit(argument));
+            argumentVariants.add(memo.get(argument));
 
         List<TokenNode> variants = new ArrayList<>();
         for (List<TokenNode> arguments : combinations(argumentVariants)) {
@@ -70,8 +93,8 @@ public final class TreeVariantGenerator {
     }
 
     private List<TokenNode> operationVariants(OperationNode operation) {
-        List<TokenNode> leftVariants = visit(operation.getLeft());
-        List<TokenNode> rightVariants = visit(operation.getRight());
+        List<TokenNode> leftVariants = memo.get(operation.getLeft());
+        List<TokenNode> rightVariants = memo.get(operation.getRight());
         List<TokenNode> combined = combine(operation.getToken(), leftVariants, rightVariants);
 
         if (!chainRoots.contains(operation))
@@ -136,15 +159,18 @@ public final class TreeVariantGenerator {
     }
 
     private List<TokenNode> distinct(List<TokenNode> variants) {
-        Map<String, TokenNode> unique = new LinkedHashMap<>();
+        TreeFormCollector collector = new TreeFormCollector();
 
         for (TokenNode variant : variants) {
-            unique.putIfAbsent(TreeWalker.structuralKey(variant), variant);
+            collector.add(variant);
 
-            if (unique.size() >= limit)
+            if (collector.size() >= limit)
                 break;
         }
 
-        return List.copyOf(unique.values());
+        return collector.forms();
+    }
+
+    private record VisitFrame(TokenNode node, boolean expanded) {
     }
 }

@@ -38,19 +38,17 @@ public class TreeBuildService {
             }
 
             if (tokenType == TokenType.RPAREN) {
-                // apply operators until paren
+
                 while (!operators.isEmpty() && !(operators.peek().type() == TokenType.LPAREN)) {
                     nodes.push(createOperation(operators.pop(), nodes));
                 }
 
                 operators.pop();
 
-                // apply function if any
                 if (!operators.isEmpty() && operators.peek().type() == TokenType.FUNCTION) {
                     Token function = operators.pop();
                     int mark = argumentMarks.pop();
 
-                    // collect args of the function
                     List<TokenNode> arguments = new ArrayList<>();
                     while (nodes.size() > mark)
                         arguments.add(nodes.pop());
@@ -62,7 +60,7 @@ public class TreeBuildService {
             }
 
             if (tokenType.isOperator()) {
-                // apply higher or equal by rule
+
                 int priority = OperatorPriority.getPriority(OperatorValue.fromSymbol(value));
                 while (!operators.isEmpty() && outranks(operators.peek(), priority, value)) {
                     nodes.push(createOperation(operators.pop(), nodes));
@@ -72,7 +70,6 @@ public class TreeBuildService {
             }
         }
 
-        // apply rest
         while (!operators.isEmpty())
             nodes.push(createOperation(operators.pop(), nodes));
 

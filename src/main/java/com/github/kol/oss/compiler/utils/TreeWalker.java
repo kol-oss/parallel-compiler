@@ -9,11 +9,15 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class TreeWalker {
     private record NodeFrame(TokenNode node, OperatorValue context) {
+    }
+
+    private record Pair(TokenNode left, TokenNode right) {
     }
 
     public static List<TokenNode> children(TokenNode node) {
@@ -93,29 +97,46 @@ public class TreeWalker {
     }
 
     public static boolean same(TokenNode left, TokenNode right) {
-        if (left == right)
-            return true;
+        Deque<Pair> pending = new ArrayDeque<>();
+        pending.push(new Pair(left, right));
 
-        if (left == null || right == null || left.getClass() != right.getClass())
-            return false;
+        while (!pending.isEmpty()) {
+            Pair pair = pending.pop();
+            TokenNode currentLeft = pair.left();
+            TokenNode currentRight = pair.right();
 
-        if (!left.getToken().value().equals(right.getToken().value()))
-            return false;
+            if (currentLeft == currentRight)
+                continue;
 
-        List<TokenNode> leftChildren = children(left);
-        List<TokenNode> rightChildren = children(right);
-
-        if (leftChildren.size() != rightChildren.size())
-            return false;
-
-        for (int i = 0; i < leftChildren.size(); i++)
-            if (!same(leftChildren.get(i), rightChildren.get(i)))
+            if (currentLeft == null || currentRight == null || currentLeft.getClass() != currentRight.getClass())
                 return false;
+
+            if (!currentLeft.getToken().value().equals(currentRight.getToken().value()))
+                return false;
+
+            List<TokenNode> leftChildren = children(currentLeft);
+            List<TokenNode> rightChildren = children(currentRight);
+
+            if (leftChildren.size() != rightChildren.size())
+                return false;
+
+            for (int i = leftChildren.size() - 1; i >= 0; i--)
+                pending.push(new Pair(leftChildren.get(i), rightChildren.get(i)));
+        }
 
         return true;
     }
 
-    public static String structuralKey(TokenNode node) {
+    public static String structuralKey(TokenNode root) {
+        Map<TokenNode, String> keys = new IdentityHashMap<>();
+
+        for (TokenNode node : postOrder(root))
+            keys.put(node, keyOf(node, keys));
+
+        return keys.get(root);
+    }
+
+    private static String keyOf(TokenNode node, Map<TokenNode, String> keys) {
         if (node instanceof FunctionNode function) {
             StringBuilder builder = new StringBuilder(function.getToken().value()).append('(');
 
@@ -123,16 +144,16 @@ public class TreeWalker {
                 if (i > 0)
                     builder.append(',');
 
-                builder.append(structuralKey(function.getArguments().get(i)));
+                builder.append(keys.get(function.getArguments().get(i)));
             }
 
             return builder.append(')').toString();
         }
 
         if (node instanceof OperationNode operation)
-            return "(" + structuralKey(operation.getLeft())
+            return "(" + keys.get(operation.getLeft())
                     + operation.getToken().value()
-                    + structuralKey(operation.getRight()) + ")";
+                    + keys.get(operation.getRight()) + ")";
 
         return node.getToken().value();
     }

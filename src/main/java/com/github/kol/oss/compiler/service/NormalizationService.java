@@ -8,20 +8,11 @@ import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.pipeline.TransformationService;
 import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
-import com.github.kol.oss.compiler.utils.ArithmeticUtils;
-import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
-import com.github.kol.oss.compiler.utils.ChainAssembler;
-import com.github.kol.oss.compiler.utils.NodeFactory;
-import com.github.kol.oss.compiler.utils.TokenMapper;
-import com.github.kol.oss.compiler.utils.TreeWalker;
+import com.github.kol.oss.compiler.utils.*;
 
 import java.util.*;
 
 public class NormalizationService extends TreeTransformationService {
-    public static TokenNode normalize(TokenNode root) {
-        return new NormalizationService().apply(root).tree();
-    }
-
     @Override
     public String name() {
         return TransformationService.NORMALIZATION;
@@ -29,7 +20,7 @@ public class NormalizationService extends TreeTransformationService {
 
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
-        Chain chain = ChainAssembler.assemble(operation, context.replacements());
+        Chain chain = ChainAssembler.assemble(operation, context::resolve);
         TokenNode rebuilt = BalancedTreeBuilder.buildBalanced(chain);
         context.replace(operation, rebuilt);
     }

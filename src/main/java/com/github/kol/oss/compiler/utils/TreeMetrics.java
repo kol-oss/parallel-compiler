@@ -4,45 +4,71 @@ import com.github.kol.oss.compiler.dto.node.FunctionNode;
 import com.github.kol.oss.compiler.dto.node.OperationNode;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
 
-public final class TreeMetrics {
-    private TreeMetrics() {
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+
+public class TreeMetrics {
+    public static int height(TokenNode root) {
+        Map<TokenNode, Integer> heights = new IdentityHashMap<>();
+
+        for (TokenNode node : TreeWalker.postOrder(root))
+            heights.put(node, heightOf(node, heights));
+
+        return heights.get(root);
     }
 
-    public static int height(TokenNode node) {
+    public static int width(TokenNode root) {
+        int[] levels = new int[height(root) + 1];
+        Deque<LevelFrame> pending = new ArrayDeque<>();
+        pending.push(new LevelFrame(root, 1));
+
+        while (!pending.isEmpty()) {
+            LevelFrame frame = pending.pop();
+            TokenNode node = frame.node();
+            int level = frame.level();
+
+            if (node instanceof OperationNode operation) {
+                levels[level]++;
+
+                pending.push(new LevelFrame(operation.getRight(), level + 1));
+                pending.push(new LevelFrame(operation.getLeft(), level + 1));
+                continue;
+            }
+
+            if (node instanceof FunctionNode function) {
+                List<TokenNode> arguments = function.getArguments();
+
+                for (int i = arguments.size() - 1; i >= 0; i--)
+                    pending.push(new LevelFrame(arguments.get(i), level));
+            }
+        }
+
+        int result = 0;
+        for (int level : levels)
+            result = Math.max(result, level);
+
+        return result;
+    }
+
+    private static int heightOf(TokenNode node, Map<TokenNode, Integer> heights) {
         if (node instanceof OperationNode operation)
-            return 1 + Math.max(height(operation.getLeft()), height(operation.getRight()));
+            return 1 + Math.max(heights.get(operation.getLeft()), heights.get(operation.getRight()));
 
         if (node instanceof FunctionNode function) {
             int result = 0;
+
             for (TokenNode argument : function.getArguments())
-                result = Math.max(result, height(argument));
+                result = Math.max(result, heights.get(argument));
+
             return result;
         }
 
         return 0;
     }
 
-    public static int width(TokenNode node) {
-        int[] levels = new int[height(node) + 1];
-        fillWidth(node, 1, levels);
-
-        int result = 0;
-        for (int level : levels)
-            result = Math.max(result, level);
-        return result;
-    }
-
-    private static void fillWidth(TokenNode node, int level, int[] levels) {
-        if (node instanceof OperationNode operation) {
-            levels[level]++;
-            fillWidth(operation.getLeft(), level + 1, levels);
-            fillWidth(operation.getRight(), level + 1, levels);
-            return;
-        }
-
-        if (node instanceof FunctionNode function) {
-            for (TokenNode argument : function.getArguments())
-                fillWidth(argument, level, levels);
-        }
+    private record LevelFrame(TokenNode node, int level) {
     }
 }

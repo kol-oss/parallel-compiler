@@ -7,7 +7,6 @@ import com.github.kol.oss.compiler.pipeline.TransformationService;
 import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
 import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
 import com.github.kol.oss.compiler.utils.NodeFactory;
-import com.github.kol.oss.compiler.utils.TreeWalker;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -25,7 +24,6 @@ public class ParallelFormService extends TreeTransformationService {
         return true;
     }
 
-    // build parallel form
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
         context.replace(operation, rebuildChain(operation, flatten(operation, context)));
@@ -42,7 +40,7 @@ public class ParallelFormService extends TreeTransformationService {
 
         while (!pending.isEmpty()) {
             Frame frame = pending.pop();
-            TokenNode node = TreeWalker.resolve(frame.node(), context.replacements());
+            TokenNode node = context.resolve(frame.node());
 
             if (!frame.term() && node instanceof OperationNode operation
                     && operation.getToken().value().equals(operator)) {
@@ -68,26 +66,18 @@ public class ParallelFormService extends TreeTransformationService {
     }
 
     private TokenNode buildSubtraction(List<TokenNode> operands) {
-        Deque<int[]> chunks = new ArrayDeque<>();
-        int end = operands.size() - 1;
-
-        while (end > 0) {
-            int mid = end / 2;
-            chunks.push(new int[]{mid + 1, end});
-            end = mid;
-        }
-
-        TokenNode result = operands.getFirst();
-        while (!chunks.isEmpty()) {
-            int[] chunk = chunks.pop();
-            TokenNode tail = BalancedTreeBuilder.buildSum(operands.subList(chunk[0], chunk[1] + 1));
-            result = NodeFactory.operation(OperatorValue.MINUS, result, tail);
-        }
-
-        return result;
+        return buildRightAssociative(operands, OperatorValue.MINUS, OperatorValue.PLUS);
     }
 
     private TokenNode buildDivision(List<TokenNode> operands) {
+        return buildRightAssociative(operands, OperatorValue.DIVISION, OperatorValue.MULTIPLY);
+    }
+
+    private TokenNode buildRightAssociative(
+            List<TokenNode> operands,
+            OperatorValue separator,
+            OperatorValue tailFamily
+    ) {
         Deque<int[]> chunks = new ArrayDeque<>();
         int end = operands.size() - 1;
 
@@ -100,8 +90,12 @@ public class ParallelFormService extends TreeTransformationService {
         TokenNode result = operands.getFirst();
         while (!chunks.isEmpty()) {
             int[] chunk = chunks.pop();
-            TokenNode tail = BalancedTreeBuilder.buildProduct(operands.subList(chunk[0], chunk[1] + 1));
-            result = NodeFactory.operation(OperatorValue.DIVISION, result, tail);
+            List<TokenNode> tailOperands = operands.subList(chunk[0], chunk[1] + 1);
+            TokenNode tail = tailFamily == OperatorValue.PLUS
+                    ? BalancedTreeBuilder.buildSum(tailOperands)
+                    : BalancedTreeBuilder.buildProduct(tailOperands);
+
+            result = NodeFactory.operation(separator, result, tail);
         }
 
         return result;

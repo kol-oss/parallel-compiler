@@ -8,7 +8,7 @@ public class FunctionNode extends TokenNode {
     private final List<TokenNode> arguments;
 
     public FunctionNode(Token token, List<TokenNode> arguments) {
-        super(token);
+        super(token, 1 + arguments.stream().mapToInt(TokenNode::getWeight).sum());
 
         this.arguments = List.copyOf(arguments);
     }

@@ -4,10 +4,11 @@ import com.github.kol.oss.compiler.dto.token.Token;
 
 public abstract class TokenNode {
     private final Token token;
-    private int weight;
+    private final int weight;
 
-    public TokenNode(Token token) {
+    protected TokenNode(Token token, int weight) {
         this.token = token;
+        this.weight = weight;
     }
 
     public Token getToken() {
@@ -16,9 +17,5 @@ public abstract class TokenNode {
 
     public int getWeight() {
         return weight;
-    }
-
-    public void setWeight(int weight) {
-        this.weight = weight;
     }
 }

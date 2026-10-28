@@ -8,10 +8,16 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.utils.NodeFactory;
+import com.github.kol.oss.compiler.utils.TreeFormCollector;
 import com.github.kol.oss.compiler.utils.TreeFormSelector;
 import com.github.kol.oss.compiler.utils.TreeWalker;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 
 public abstract class TreeTransformationService implements TransformationService {
@@ -19,11 +25,9 @@ public abstract class TreeTransformationService implements TransformationService
     public final TransformationResult apply(TokenNode root) {
         Context context = new Context();
 
-        // find chain roots
         Set<TokenNode> chainRoots = Collections.newSetFromMap(new IdentityHashMap<>());
         chainRoots.addAll(TreeWalker.collectChainRoots(root, strictChains()));
 
-        // process nodes in postorder
         for (TokenNode node : TreeWalker.postOrder(root)) {
             if (node instanceof ValueNode)
                 continue;
@@ -39,16 +43,14 @@ public abstract class TreeTransformationService implements TransformationService
                 if (!chainRoots.contains(node))
                     continue;
 
-                // rewrite whole chain
                 rewriteChain(operation, context);
                 continue;
             }
 
-            // rewrite single operation
             rewriteOperation(operation, context);
         }
 
-        TokenNode transformed = TreeWalker.resolve(root, context.replacements());
+        TokenNode transformed = context.resolve(root);
 
         return new TransformationResult(
                 name(),
@@ -63,13 +65,13 @@ public abstract class TreeTransformationService implements TransformationService
         return List.of(transformed);
     }
 
-    // selects every new form that is optimal by height first and width second;
-    // the incoming form is kept as well when it already is one of the optimal ones
     protected final List<TokenNode> optimalForms(TokenNode original, TokenNode primary, List<TokenNode> candidates) {
-        List<TokenNode> forms = new ArrayList<>(mergeForms(primary, candidates));
-        forms.add(original);
+        TreeFormCollector collector = new TreeFormCollector();
+        collector.add(primary);
+        collector.addAll(candidates);
+        collector.add(original);
 
-        return TreeFormSelector.selectOptimal(forms);
+        return TreeFormSelector.selectOptimal(collector.forms());
     }
 
     protected final Set<TokenNode> collectChainRoots(TokenNode original, Predicate<OperatorValue> families) {
@@ -83,16 +85,6 @@ public abstract class TreeTransformationService implements TransformationService
         }
 
         return roots;
-    }
-
-    protected final List<TokenNode> mergeForms(TokenNode primary, List<TokenNode> candidates) {
-        Map<String, TokenNode> forms = new LinkedHashMap<>();
-        forms.put(TreeWalker.structuralKey(primary), primary);
-
-        for (TokenNode candidate : candidates)
-            forms.putIfAbsent(TreeWalker.structuralKey(candidate), candidate);
-
-        return List.copyOf(forms.values());
     }
 
     protected boolean handlesChain(OperatorValue family) {
@@ -109,33 +101,30 @@ public abstract class TreeTransformationService implements TransformationService
         propagateOperation(operation, context);
     }
 
-    // propagate changes to function args
     protected final void propagateFunction(FunctionNode function, Context context) {
         List<TokenNode> arguments = function.getArguments().stream()
-                .map(argument -> TreeWalker.resolve(argument, context.replacements()))
+                .map(context::resolve)
                 .toList();
 
         if (!arguments.equals(function.getArguments()))
             context.replace(function, NodeFactory.function(function.getToken(), arguments));
     }
 
-    // propagate changes to operation children
     protected final void propagateOperation(OperationNode operation, Context context) {
-        TokenNode left = TreeWalker.resolve(operation.getLeft(), context.replacements());
-        TokenNode right = TreeWalker.resolve(operation.getRight(), context.replacements());
+        TokenNode left = context.resolve(operation.getLeft());
+        TokenNode right = context.resolve(operation.getRight());
 
         if (left != operation.getLeft() || right != operation.getRight())
             context.replace(operation, NodeFactory.operation(operation.getToken(), left, right));
     }
 
-    // holds replacements, applied changes and errors for current transformation
     protected static final class Context {
         private final Map<TokenNode, TokenNode> replacements = new IdentityHashMap<>();
         private final List<Transformation> applied = new ArrayList<>();
         private final List<PositionedException> diagnostics = new ArrayList<>();
 
-        public Map<TokenNode, TokenNode> replacements() {
-            return replacements;
+        public TokenNode resolve(TokenNode node) {
+            return TreeWalker.resolve(node, replacements);
         }
 
         public List<Transformation> applied() {

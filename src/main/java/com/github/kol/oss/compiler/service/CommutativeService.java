@@ -1,6 +1,7 @@
 package com.github.kol.oss.compiler.service;
 
 import com.github.kol.oss.compiler.constant.OperatorValue;
+import com.github.kol.oss.compiler.constant.SearchLimits;
 import com.github.kol.oss.compiler.constant.TermSign;
 import com.github.kol.oss.compiler.dto.chain.Chain;
 import com.github.kol.oss.compiler.dto.chain.Term;
@@ -9,27 +10,11 @@ import com.github.kol.oss.compiler.dto.node.TokenNode;
 import com.github.kol.oss.compiler.dto.node.ValueNode;
 import com.github.kol.oss.compiler.pipeline.TransformationService;
 import com.github.kol.oss.compiler.pipeline.TreeTransformationService;
-import com.github.kol.oss.compiler.utils.ArithmeticUtils;
-import com.github.kol.oss.compiler.utils.BalancedTreeBuilder;
-import com.github.kol.oss.compiler.utils.ChainAssembler;
-import com.github.kol.oss.compiler.utils.TreeVariantGenerator;
-import com.github.kol.oss.compiler.utils.TreeWalker;
+import com.github.kol.oss.compiler.utils.*;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class CommutativeService extends TreeTransformationService {
-    // every order of a chain is a distinct equivalent form, so the complete
-    // search is factorial; the caps keep the enumeration deterministic and bounded
-    private static final int MAX_ORDER_VARIANTS = 50_000;
-    private static final int MAX_CHAIN_FORMS = 50_000;
-    private static final int MAX_TREE_VARIANTS = 50_000;
-
     @Override
     public String name() {
         return TransformationService.COMMUTATIVE;
@@ -46,7 +31,7 @@ public class CommutativeService extends TreeTransformationService {
                 original,
                 roots,
                 this::commutativeCandidates,
-                MAX_TREE_VARIANTS
+                SearchLimits.MAX_TREE_VARIANTS
         );
 
         return optimalForms(original, transformed, candidates);
@@ -54,26 +39,20 @@ public class CommutativeService extends TreeTransformationService {
 
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
-        Chain chain = ChainAssembler.assemble(operation, context.replacements());
-        // drop zeros for sum
+        Chain chain = ChainAssembler.assemble(operation, context::resolve);
         List<Term> terms = chain.family() == OperatorValue.PLUS ? dropZeros(chain.terms()) : chain.terms();
 
-        // split by sign
         List<Term> positives = filter(terms, TermSign.POSITIVE);
         List<Term> negatives = filter(terms, TermSign.NEGATIVE);
 
-        // sort by weight
         List<Term> sortedPositives = sortedByWeight(positives);
         List<Term> sortedNegatives = sortedByWeight(negatives);
 
-        // check order change
         boolean orderChanged = !sameOrder(positives, sortedPositives) || !sameOrder(negatives, sortedNegatives);
 
         List<Term> reordered = new ArrayList<>(sortedPositives);
         reordered.addAll(sortedNegatives);
 
-        // rebuild: buildBalanced keeps the sign-aware grouping, so a mixed
-        // addition/subtraction chain does not lose a level at the root
         TokenNode rebuilt = BalancedTreeBuilder.buildBalanced(new Chain(chain.family(), reordered));
         context.replace(operation, rebuilt);
 
@@ -81,19 +60,24 @@ public class CommutativeService extends TreeTransformationService {
             context.record(operation, rebuilt);
     }
 
-    // returns every order of the chain, not only a heuristic subset
     private List<TokenNode> commutativeCandidates(OperationNode operation) {
-        Chain chain = ChainAssembler.assemble(operation, Map.of());
+        Chain chain = ChainAssembler.assemble(operation);
         List<Term> terms = chain.family() == OperatorValue.PLUS ? dropZeros(chain.terms()) : chain.terms();
 
         if (terms.size() < 2)
             return List.of(BalancedTreeBuilder.buildBalanced(new Chain(chain.family(), terms)));
 
-        Map<String, TokenNode> forms = new LinkedHashMap<>();
+        TreeFormCollector forms = new TreeFormCollector();
         addCandidate(forms, chain, canonicalOrder(terms));
 
-        List<List<Term>> positiveOrders = orderingsUpTo(distinctTerms(filter(terms, TermSign.POSITIVE)));
-        List<List<Term>> negativeOrders = orderingsUpTo(distinctTerms(filter(terms, TermSign.NEGATIVE)));
+        List<List<Term>> positiveOrders = TermPermutations.generate(
+                distinctTerms(filter(terms, TermSign.POSITIVE)),
+                SearchLimits.MAX_ORDER_VARIANTS
+        );
+        List<List<Term>> negativeOrders = TermPermutations.generate(
+                distinctTerms(filter(terms, TermSign.NEGATIVE)),
+                SearchLimits.MAX_ORDER_VARIANTS
+        );
         int examined = 0;
 
         for (List<Term> positives : positiveOrders) {
@@ -102,22 +86,20 @@ public class CommutativeService extends TreeTransformationService {
                 ordered.addAll(negatives);
                 addCandidate(forms, chain, ordered);
 
-                if (++examined >= MAX_CHAIN_FORMS || forms.size() >= MAX_CHAIN_FORMS)
-                    return List.copyOf(forms.values());
+                if (++examined >= SearchLimits.MAX_CHAIN_FORMS || forms.size() >= SearchLimits.MAX_CHAIN_FORMS)
+                    return forms.forms();
             }
         }
 
-        return List.copyOf(forms.values());
+        return forms.forms();
     }
 
-    // same order as the primary commutative transformation
     private List<Term> canonicalOrder(List<Term> terms) {
         List<Term> reordered = new ArrayList<>(sortedByWeight(filter(terms, TermSign.POSITIVE)));
         reordered.addAll(sortedByWeight(filter(terms, TermSign.NEGATIVE)));
         return reordered;
     }
 
-    // identical terms produce identical forms, so they are enumerated once
     private List<Term> distinctTerms(List<Term> terms) {
         Map<String, Term> unique = new LinkedHashMap<>();
 
@@ -127,53 +109,17 @@ public class CommutativeService extends TreeTransformationService {
         return List.copyOf(unique.values());
     }
 
-    private List<List<Term>> orderingsUpTo(List<Term> terms) {
-        List<List<Term>> result = new ArrayList<>();
-
-        if (terms.size() <= 1) {
-            result.add(List.copyOf(terms));
-            return result;
-        }
-
-        permute(new ArrayList<>(terms), 0, result);
-        return result;
-    }
-
-    private void permute(List<Term> terms, int index, List<List<Term>> result) {
-        if (result.size() >= MAX_ORDER_VARIANTS)
-            return;
-
-        if (index == terms.size()) {
-            result.add(List.copyOf(terms));
-            return;
-        }
-
-        for (int i = index; i < terms.size() && result.size() < MAX_ORDER_VARIANTS; i++) {
-            Collections.swap(terms, index, i);
-            permute(terms, index + 1, result);
-            Collections.swap(terms, index, i);
-        }
-    }
-
-    private void addCandidate(Map<String, TokenNode> forms, Chain chain, List<Term> ordered) {
+    private void addCandidate(TreeFormCollector forms, Chain chain, List<Term> ordered) {
         Chain reordered = new Chain(chain.family(), ordered);
 
-        // buildBalanced picks one of buildSigned / buildBalancedSigned; keep both so
-        // the selector can compare every tied form instead of silently dropping one
-        addForm(forms, BalancedTreeBuilder.buildBalanced(reordered));
-        addForm(forms, BalancedTreeBuilder.buildSigned(reordered));
+        forms.add(BalancedTreeBuilder.buildBalanced(reordered));
+        forms.add(BalancedTreeBuilder.buildSigned(reordered));
     }
 
-    private void addForm(Map<String, TokenNode> forms, TokenNode form) {
-        forms.putIfAbsent(TreeWalker.structuralKey(form), form);
-    }
-
-    // filter by sign
     private List<Term> filter(List<Term> terms, TermSign sign) {
         return terms.stream().filter(term -> term.sign() == sign).toList();
     }
 
-    // sort by weight desc
     private List<Term> sortedByWeight(List<Term> terms) {
         return terms.stream()
                 .sorted(Comparator.comparingInt((Term term) -> term.node().getWeight()).reversed())

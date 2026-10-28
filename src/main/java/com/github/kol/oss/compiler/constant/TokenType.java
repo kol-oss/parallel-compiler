@@ -20,11 +20,9 @@ public enum TokenType {
     public static TokenType fromChar(TokenType state, char character) {
         String symbol = String.valueOf(character);
 
-        // empty symbols - always SKIP
         if (symbol.matches(SymbolRegex.SKIP))
             return SKIP;
 
-        // numbers - INTEGER, FLOAT or VARIABLE
         if (symbol.matches(SymbolRegex.NUMBER)) {
             if (state == FLOAT || state == VARIABLE)
                 return state;
@@ -32,7 +30,6 @@ public enum TokenType {
             return INTEGER;
         }
 
-        // dots - FLOAT
         if (symbol.matches(SymbolRegex.FLOAT)) {
             if (state == FLOAT)
                 throw new InvalidSymbolException(character);
@@ -40,27 +37,21 @@ public enum TokenType {
             return FLOAT;
         }
 
-        // operation symbols - OPERATOR
         if (symbol.matches(SymbolRegex.OPERATOR))
             return OPERATOR;
 
-        // logical symbols - LOGICAL_OPERATOR
         if (symbol.matches(SymbolRegex.LOGICAL_OPERATOR))
             return LOGICAL_OPERATOR;
 
-        // comma - COMMA
         if (symbol.matches(SymbolRegex.COMMA))
             return COMMA;
 
-        // left parenthesis - LPAREN
         if (symbol.matches(SymbolRegex.LPAREN))
             return LPAREN;
 
-        // right parenthesis - RPAREN
         if (symbol.matches(SymbolRegex.RPAREN))
             return RPAREN;
 
-        // letters and underscores - VARIABLE
         if (symbol.matches(SymbolRegex.TEXT))
             return VARIABLE;
 

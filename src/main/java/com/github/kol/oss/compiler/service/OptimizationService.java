@@ -28,18 +28,16 @@ public class OptimizationService extends TreeTransformationService {
 
     @Override
     protected void rewriteChain(OperationNode operation, Context context) {
-        Chain chain = ChainAssembler.assemble(operation, context.replacements());
+        Chain chain = ChainAssembler.assemble(operation, context::resolve);
         List<Term> terms = chain.terms();
         boolean sum = chain.family() == OperatorValue.PLUS;
 
-        // check division by zero
         if (!sum && hasDivisorZero(terms)) {
             reportDivisorZero(terms, context);
             context.replace(operation, rebuild(chain.family(), terms));
             return;
         }
 
-        // check zero numerator
         if (!sum && hasZeroNumerator(terms)) {
             TokenNode zero = zeroValue(terms);
             context.replace(operation, zero);
@@ -49,13 +47,12 @@ public class OptimizationService extends TreeTransformationService {
 
         boolean cancelled = false;
 
-        // cancel opposites
         List<Term> reduced = cancelOpposites(terms);
         if (reduced.size() < terms.size()) {
             cancelled = true;
 
             if (reduced.isEmpty()) {
-                // all cancelled
+
                 TokenNode collapsed = sum ? cancelValue(terms) : oneValue(terms);
                 context.replace(operation, collapsed);
                 context.record(operation, collapsed);
@@ -65,7 +62,6 @@ public class OptimizationService extends TreeTransformationService {
             terms = reduced;
         }
 
-        // split constants and others
         List<Term> constants = new ArrayList<>();
         List<Term> others = new ArrayList<>();
         for (Term term : terms) {
@@ -85,17 +81,15 @@ public class OptimizationService extends TreeTransformationService {
             return;
         }
 
-        // fold constants
         Token folded = foldConstants(constants, sum);
         if (others.isEmpty()) {
-            // only constants
+
             TokenNode value = NodeFactory.value(folded);
             context.replace(operation, value);
             context.record(operation, value);
             return;
         }
 
-        // check if can drop neutral
         boolean safeDrop = isNeutral(folded, sum) && others.getFirst().sign() == TermSign.POSITIVE;
 
         if (constants.size() == 1 && !safeDrop) {
@@ -108,7 +102,6 @@ public class OptimizationService extends TreeTransformationService {
             return;
         }
 
-        // apply optimization
         List<Term> optimized = safeDrop ? others : replaceFirstConstant(terms, folded, sum);
         TokenNode rebuilt = rebuild(chain.family(), optimized);
 
@@ -118,15 +111,14 @@ public class OptimizationService extends TreeTransformationService {
 
     @Override
     protected void rewriteOperation(OperationNode operation, Context context) {
-        TokenNode left = TreeWalker.resolve(operation.getLeft(), context.replacements());
-        TokenNode right = TreeWalker.resolve(operation.getRight(), context.replacements());
+        TokenNode left = context.resolve(operation.getLeft());
+        TokenNode right = context.resolve(operation.getRight());
         OperatorValue operator = TokenMapper.tokenToOperator(operation.getToken());
 
-        // check division by zero
         if (right instanceof ValueNode rightValue && isZero(rightValue) && ArithmeticUtils.isDivisionLike(operator)) {
             reportDivisorZero(rightValue, context);
         } else if (left instanceof ValueNode leftValue && right instanceof ValueNode rightValue) {
-            // fold constants
+
             Optional<Token> folded = ArithmeticUtils.applyOperation(
                     leftValue.getToken(),
                     rightValue.getToken(),
@@ -141,7 +133,6 @@ public class OptimizationService extends TreeTransformationService {
             }
         }
 
-        // propagate if changed
         if (left != operation.getLeft() || right != operation.getRight())
             context.replace(operation, NodeFactory.operation(operation.getToken(), left, right));
     }
@@ -198,7 +189,6 @@ public class OptimizationService extends TreeTransformationService {
         return NodeFactory.value(token);
     }
 
-    // replace first constant with folded
     private List<Term> replaceFirstConstant(List<Term> terms, Token folded, boolean sum) {
         List<Term> result = new ArrayList<>();
         boolean inserted = false;
@@ -217,7 +207,6 @@ public class OptimizationService extends TreeTransformationService {
         return result;
     }
 
-    // build folded term with sign
     private Term foldedTerm(Token folded, boolean sum) {
         boolean negative = sum && folded.value().startsWith(OperatorValue.MINUS.toSymbol());
 
@@ -228,7 +217,6 @@ public class OptimizationService extends TreeTransformationService {
         return new Term(NodeFactory.value(absolute), TermSign.NEGATIVE);
     }
 
-    // fold all constants
     private Token foldConstants(List<Term> constants, boolean sum) {
         OperatorValue positiveJoin = sum ? OperatorValue.PLUS : OperatorValue.MULTIPLY;
         OperatorValue negativeJoin = sum ? OperatorValue.MINUS : OperatorValue.DIVISION;
@@ -292,7 +280,6 @@ public class OptimizationService extends TreeTransformationService {
         return sum ? ArithmeticUtils.isZero(folded) : ArithmeticUtils.isOne(folded);
     }
 
-    // rebuild chain
     private TokenNode rebuild(OperatorValue family, List<Term> terms) {
         List<Term> full = terms;
 
