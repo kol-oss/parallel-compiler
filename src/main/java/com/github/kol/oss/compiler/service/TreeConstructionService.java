@@ -11,7 +11,7 @@ import com.github.kol.oss.compiler.utils.NodeFactory;
 
 import java.util.*;
 
-public class TreeBuildService {
+public class TreeConstructionService {
     public TokenNode buildTree(List<Token> tokens) {
         Deque<TokenNode> nodes = new ArrayDeque<>();
         Deque<Token> operators = new ArrayDeque<>();

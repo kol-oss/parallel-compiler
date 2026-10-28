@@ -22,13 +22,13 @@ public class Main {
 
         LexicalAnalysisService lexicalAnalysisService = new LexicalAnalysisService();
         SyntaxValidationService syntaxValidationService = new SyntaxValidationService();
-        TreeBuildService treeBuildService = new TreeBuildService();
+        TreeConstructionService treeConstructionService = new TreeConstructionService();
         NormalizationService normalizationService = new NormalizationService();
         AssociativeService associativeService = new AssociativeService();
 
         CompilerPipeline pipeline = new CompilerPipeline(List.of(
                 new OptimizationService(),
-                new ParallelFormService(),
+                new ParallelizationService(),
                 new CommutativeService(),
                 associativeService,
                 normalizationService
@@ -64,7 +64,7 @@ public class Main {
                 if (lexical.tokens().isEmpty())
                     continue;
 
-                TokenNode tree = treeBuildService.buildTree(lexical.tokens());
+                TokenNode tree = treeConstructionService.buildTree(lexical.tokens());
 
                 TokenNode currentTree;
                 for (TransformationResult transformation : pipeline.run(tree)) {

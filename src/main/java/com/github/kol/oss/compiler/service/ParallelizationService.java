@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
-public class ParallelFormService extends TreeTransformationService {
+public class ParallelizationService extends TreeTransformationService {
     @Override
     public String name() {
         return TransformationService.PARALLEL;
