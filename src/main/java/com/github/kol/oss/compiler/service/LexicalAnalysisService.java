@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class LexicalAnalysisService {
-
     public LexicalResult tokenize(String expression) {
         return new Lexer().run(expression);
     }
@@ -116,12 +115,10 @@ public class LexicalAnalysisService {
                 List<Token> factor = normalizeUnaryMinus(input.subList(i + 1, factorEnd));
 
                 if (isLeadingPosition(previous)) {
-
                     result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
                     result.add(token);
                     result.addAll(factor);
                 } else {
-
                     result.add(new Token(OperatorSymbol.LEFT_PARENTHESIS, TokenType.LPAREN, token.position()));
                     result.add(new Token(NumberConstant.ZERO, TokenType.INTEGER, token.position()));
                     result.add(token);

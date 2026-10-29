@@ -11,9 +11,11 @@ import java.util.*;
 public class AssociativeSearch {
     private final ExpressionKeyResolver keys = new ExpressionKeyResolver();
     private final FactorGrouper grouper = new FactorGrouper(keys, SearchLimits.MAX_GROUPINGS_PER_FACTOR);
+
     private final Map<String, List<Term>> memo = new HashMap<>();
     private final Map<String, List<List<Term>>> variantMemo = new HashMap<>();
     private final Map<String, List<List<Term>>> subsetVariantMemo = new HashMap<>();
+
     private int budget = SearchLimits.ASSOCIATIVE_SEARCH_BUDGET;
     private int variantBudget = SearchLimits.ASSOCIATIVE_VARIANT_SEARCH_BUDGET;
 

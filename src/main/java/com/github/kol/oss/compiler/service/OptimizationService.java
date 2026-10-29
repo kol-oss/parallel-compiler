@@ -52,7 +52,6 @@ public class OptimizationService extends TreeTransformationService {
             cancelled = true;
 
             if (reduced.isEmpty()) {
-
                 TokenNode collapsed = sum ? cancelValue(terms) : oneValue(terms);
                 context.replace(operation, collapsed);
                 context.record(operation, collapsed);
@@ -83,7 +82,6 @@ public class OptimizationService extends TreeTransformationService {
 
         Token folded = foldConstants(constants, sum);
         if (others.isEmpty()) {
-
             TokenNode value = NodeFactory.value(folded);
             context.replace(operation, value);
             context.record(operation, value);
@@ -118,7 +116,6 @@ public class OptimizationService extends TreeTransformationService {
         if (right instanceof ValueNode rightValue && isZero(rightValue) && ArithmeticUtils.isDivisionLike(operator)) {
             reportDivisorZero(rightValue, context);
         } else if (left instanceof ValueNode leftValue && right instanceof ValueNode rightValue) {
-
             Optional<Token> folded = ArithmeticUtils.applyOperation(
                     leftValue.getToken(),
                     rightValue.getToken(),

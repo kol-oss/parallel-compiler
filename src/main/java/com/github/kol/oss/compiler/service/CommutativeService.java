@@ -74,12 +74,13 @@ public class CommutativeService extends TreeTransformationService {
                 distinctTerms(filter(terms, TermSign.POSITIVE)),
                 SearchLimits.MAX_ORDER_VARIANTS
         );
+
         List<List<Term>> negativeOrders = TermPermutations.generate(
                 distinctTerms(filter(terms, TermSign.NEGATIVE)),
                 SearchLimits.MAX_ORDER_VARIANTS
         );
-        int examined = 0;
 
+        int examined = 0;
         for (List<Term> positives : positiveOrders) {
             for (List<Term> negatives : negativeOrders) {
                 List<Term> ordered = new ArrayList<>(positives);

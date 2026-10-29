@@ -29,6 +29,7 @@ public class NormalizationService extends TreeTransformationService {
         TokenNode foldedTree = fold(root);
         if (foldedTree instanceof ValueNode value && ArithmeticUtils.isNumeric(value.getToken()))
             return Optional.of(value.getToken());
+
         return Optional.empty();
     }
 
@@ -38,6 +39,7 @@ public class NormalizationService extends TreeTransformationService {
             if (node instanceof ValueNode) {
                 continue;
             }
+
             if (node instanceof FunctionNode function) {
                 List<TokenNode> args = new ArrayList<>();
                 boolean changed = false;
@@ -65,6 +67,7 @@ public class NormalizationService extends TreeTransformationService {
                             rightValue.getToken(),
                             TokenMapper.tokenToOperator(operation.getToken())
                     );
+
                     if (result.isPresent()) {
                         folded.put(operation, NodeFactory.value(result.get()));
                         continue;
@@ -76,6 +79,7 @@ public class NormalizationService extends TreeTransformationService {
                 }
             }
         }
+
         return TreeWalker.resolve(root, folded);
     }
 }
