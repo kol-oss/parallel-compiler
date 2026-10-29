@@ -91,8 +91,7 @@ public class ConsoleView {
         }
 
         if (forms.size() > displayed)
-            System.out.println("  ... " + (forms.size() - displayed)
-                    + " more forms omitted (display limit: " + MAX_DISPLAYED_FORMS + ")");
+            System.out.println("  ... " + (forms.size() - displayed) + " more forms omitted");
 
         System.out.println();
     }
