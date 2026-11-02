@@ -74,20 +74,20 @@ public class CommutativeService extends TreeTransformationService {
         List<Term> negativeTerms = filter(terms, TermSign.NEGATIVE);
 
         List<List<Term>> positiveOrders = TermPermutations.generate(
-                distinctTerms(positiveTerms),
+                positiveTerms,
                 SearchLimits.MAX_ORDER_VARIANTS
         );
 
         List<List<Term>> negativeOrders = TermPermutations.generate(
-                distinctTerms(negativeTerms),
+                negativeTerms,
                 SearchLimits.MAX_ORDER_VARIANTS
         );
 
         int examined = 0;
         for (List<Term> positives : positiveOrders) {
             for (List<Term> negatives : negativeOrders) {
-                List<Term> ordered = new ArrayList<>(expand(positiveTerms, positives));
-                ordered.addAll(expand(negativeTerms, negatives));
+                List<Term> ordered = new ArrayList<>(positives);
+                ordered.addAll(negatives);
                 addCandidate(forms, chain, ordered);
 
                 if (++examined >= SearchLimits.MAX_CHAIN_FORMS || forms.size() >= SearchLimits.MAX_CHAIN_FORMS)
@@ -102,33 +102,6 @@ public class CommutativeService extends TreeTransformationService {
         List<Term> reordered = new ArrayList<>(sortedByWeight(filter(terms, TermSign.POSITIVE)));
         reordered.addAll(sortedByWeight(filter(terms, TermSign.NEGATIVE)));
         return reordered;
-    }
-
-    private List<Term> distinctTerms(List<Term> terms) {
-        Map<String, Term> unique = new LinkedHashMap<>();
-
-        for (Term term : terms)
-            unique.putIfAbsent(termKey(term), term);
-
-        return List.copyOf(unique.values());
-    }
-
-    private List<Term> expand(List<Term> terms, List<Term> order) {
-        Map<String, List<Term>> occurrences = new LinkedHashMap<>();
-
-        for (Term term : terms)
-            occurrences.computeIfAbsent(termKey(term), _ -> new ArrayList<>()).add(term);
-
-        List<Term> expanded = new ArrayList<>();
-
-        for (Term term : order)
-            expanded.addAll(occurrences.get(termKey(term)));
-
-        return expanded;
-    }
-
-    private String termKey(Term term) {
-        return term.sign() + ":" + TreeWalker.structuralKey(term.node());
     }
 
     private void addCandidate(TreeFormCollector forms, Chain chain, List<Term> ordered) {
