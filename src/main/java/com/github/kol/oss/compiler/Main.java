@@ -1,6 +1,7 @@
 package com.github.kol.oss.compiler;
 
 import com.github.kol.oss.compiler.dto.node.TokenNode;
+import com.github.kol.oss.compiler.dto.schedule.ExecutionSchedule;
 import com.github.kol.oss.compiler.dto.token.LexicalResult;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.pipeline.CompilerPipeline;
@@ -25,6 +26,8 @@ public class Main {
         TreeConstructionService treeConstructionService = new TreeConstructionService();
         NormalizationService normalizationService = new NormalizationService();
         AssociativeService associativeService = new AssociativeService();
+        VectorSystemService vectorSystemService = new VectorSystemService();
+        PerformanceService performanceService = new PerformanceService();
 
         List<TransformationService> services = List.of(
                 new OptimizationService(),
@@ -102,6 +105,11 @@ public class Main {
                             view.printEquivalentForm(normalized);
                             normalizationService.evaluate(normalized).ifPresent(view::printResult);
                             view.printTree(normalized);
+
+                            ExecutionSchedule schedule = vectorSystemService.execute(normalized);
+                            view.printVectorSystemConfiguration();
+                            view.printExecutionTimeline(schedule);
+                            view.printPerformanceMetrics(performanceService.evaluate(schedule));
                         }
                     }
                 }

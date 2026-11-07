@@ -1,7 +1,13 @@
 package com.github.kol.oss.compiler.view;
 
+import com.github.kol.oss.compiler.constant.OperatorValue;
+import com.github.kol.oss.compiler.constant.VectorSystemConfig;
 import com.github.kol.oss.compiler.dto.change.Transformation;
 import com.github.kol.oss.compiler.dto.node.TokenNode;
+import com.github.kol.oss.compiler.dto.performance.BlockEfficiency;
+import com.github.kol.oss.compiler.dto.performance.PerformanceMetrics;
+import com.github.kol.oss.compiler.dto.schedule.ExecutionSchedule;
+import com.github.kol.oss.compiler.dto.schedule.ScheduleEntry;
 import com.github.kol.oss.compiler.dto.token.Token;
 import com.github.kol.oss.compiler.exception.PositionedException;
 import com.github.kol.oss.compiler.utils.TreeMetrics;
@@ -10,8 +16,11 @@ import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 public class ConsoleView {
     private static final int MAX_DISPLAYED_FORMS = 100;
@@ -76,9 +85,7 @@ public class ConsoleView {
     }
 
     public void printEquivalentForms(List<TokenNode> forms) {
-
         int displayed = Math.min(forms.size(), MAX_DISPLAYED_FORMS);
-
         System.out.println("Equivalent forms (" + forms.size() + "):");
 
         for (int i = 0; i < displayed; i++) {
@@ -111,6 +118,77 @@ public class ConsoleView {
         System.out.println();
     }
 
+    public void printVectorSystemConfiguration() {
+        System.out.printf("Vector system: %d adders, %d subtractors, %d multipliers, %d dividers%n",
+                VectorSystemConfig.ADDERS,
+                VectorSystemConfig.SUBTRACTORS,
+                VectorSystemConfig.MULTIPLIERS,
+                VectorSystemConfig.DIVIDERS);
+        System.out.printf("Operation durations: %s = %d, %s = %d, %s = %d, %s = %d%n",
+                OperatorValue.PLUS.toSymbol(),
+                VectorSystemConfig.ADDITION_DURATION,
+                OperatorValue.MINUS.toSymbol(),
+                VectorSystemConfig.SUBTRACTION_DURATION,
+                OperatorValue.MULTIPLY.toSymbol(),
+                VectorSystemConfig.MULTIPLICATION_DURATION,
+                OperatorValue.DIVISION.toSymbol(),
+                VectorSystemConfig.DIVISION_DURATION);
+        System.out.println();
+    }
+
+    public void printExecutionTimeline(ExecutionSchedule schedule) {
+        if (schedule.entries().isEmpty()) {
+            System.out.println("No operations to execute.");
+            System.out.println();
+            return;
+        }
+
+        for (int tick = 0; tick < schedule.parallelTime(); tick++) {
+            int currentTick = tick;
+            List<ScheduleEntry> active = schedule.entries().stream()
+                    .filter(entry -> entry.start() <= currentTick && currentTick < entry.finish())
+                    .sorted(Comparator.comparingInt(ScheduleEntry::start)
+                            .thenComparingInt(ScheduleEntry::block))
+                    .toList();
+
+            if (active.isEmpty())
+                continue;
+
+            String operations = active.stream()
+                    .map(entry -> ExpressionFormatter.format(entry.operation()) + " [" + blockLabel(entry) + "]")
+                    .collect(Collectors.joining(", "));
+
+            System.out.println((tick + 1) + ": " + operations);
+        }
+
+        System.out.println();
+    }
+
+    public void printPerformanceMetrics(PerformanceMetrics metrics) {
+        System.out.printf(Locale.US, "%-20s%d%n", "Sequential time:", metrics.sequentialTime());
+        System.out.printf(Locale.US, "%-20s%d%n", "Parallel time:", metrics.parallelTime());
+        System.out.printf(Locale.US, "%-20s%d / %d = %.2f%n",
+                "Speedup:", metrics.sequentialTime(), metrics.parallelTime(), metrics.speedup());
+        System.out.printf(Locale.US, "%-20s%.2f / %d = %.2f (%.2f%%)%n",
+                "Efficiency:", metrics.speedup(), metrics.blockCount(), metrics.efficiency(), metrics.efficiency() * 100);
+
+        if (metrics.parallelTime() > 0) {
+            System.out.println("Efficiency by block:");
+
+            for (BlockEfficiency block : metrics.blockEfficiencies()) {
+                System.out.printf(Locale.US, "[%s] (%d / %d) / %d = %.2f (%.2f%%)%n",
+                        operatorCode(block.operator()),
+                        block.busyTime(),
+                        block.parallelTime(),
+                        block.blockCount(),
+                        block.efficiency(),
+                        block.efficiency() * 100);
+            }
+        }
+
+        System.out.println();
+    }
+
     public void printErrors(String expression, List<PositionedException> exceptions) {
         System.out.printf("%-12s%s%n", "Expression:", expression);
 
@@ -139,5 +217,23 @@ public class ConsoleView {
                 + ExpressionFormatter.format(transformation.before())
                 + " => "
                 + ExpressionFormatter.format(transformation.after())));
+    }
+
+    private String blockLabel(ScheduleEntry entry) {
+        return blockLabel(entry.block(), OperatorValue.fromSymbol(entry.operation().getToken().value()));
+    }
+
+    private String blockLabel(int block, OperatorValue operator) {
+        return operatorCode(operator) + "-" + (block + 1);
+    }
+
+    private String operatorCode(OperatorValue operator) {
+        return switch (operator) {
+            case PLUS -> "P";
+            case MINUS -> "S";
+            case MULTIPLY -> "M";
+            case DIVISION -> "D";
+            default -> operator.toSymbol();
+        };
     }
 }
