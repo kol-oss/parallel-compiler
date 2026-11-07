@@ -1,6 +1,7 @@
 package com.github.kol.oss.compiler;
 
 import com.github.kol.oss.compiler.dto.node.TokenNode;
+import com.github.kol.oss.compiler.dto.performance.PerformanceMetrics;
 import com.github.kol.oss.compiler.dto.schedule.ExecutionSchedule;
 import com.github.kol.oss.compiler.dto.token.LexicalResult;
 import com.github.kol.oss.compiler.exception.PositionedException;
@@ -9,6 +10,7 @@ import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import com.github.kol.oss.compiler.pipeline.TransformationService;
 import com.github.kol.oss.compiler.service.*;
 import com.github.kol.oss.compiler.view.ConsoleView;
+import com.github.kol.oss.compiler.view.ScheduleJsonExporter;
 
 import java.util.*;
 
@@ -28,6 +30,7 @@ public class Main {
         AssociativeService associativeService = new AssociativeService();
         VectorSystemService vectorSystemService = new VectorSystemService();
         PerformanceService performanceService = new PerformanceService();
+        ScheduleJsonExporter scheduleJsonExporter = new ScheduleJsonExporter();
 
         List<TransformationService> services = List.of(
                 new OptimizationService(),
@@ -107,9 +110,11 @@ public class Main {
                             view.printTree(normalized);
 
                             ExecutionSchedule schedule = vectorSystemService.execute(normalized);
+                            PerformanceMetrics metrics = performanceService.evaluate(schedule);
                             view.printVectorSystemConfiguration();
                             view.printExecutionTimeline(schedule);
-                            view.printPerformanceMetrics(performanceService.evaluate(schedule));
+                            view.printPerformanceMetrics(metrics);
+                            scheduleJsonExporter.export(schedule, metrics);
                         }
                     }
                 }

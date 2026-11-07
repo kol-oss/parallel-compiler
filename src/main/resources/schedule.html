@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Block Occupancy</title>
+</head>
+<body>
+    <h1>Block Occupancy</h1>
+    <div id="content">Loading schedule.json...</div>
+
+    <script>
+        const content = document.getElementById('content');
+        let lastPayload = '';
+
+        async function loadSchedule() {
+            try {
+                const response = await fetch('schedule.json?t=' + Date.now(), { cache: 'no-store' });
+
+                if (!response.ok)
+                    throw new Error(response.status + ' ' + response.statusText);
+
+                const data = await response.json();
+                const payload = JSON.stringify(data);
+
+                if (payload === lastPayload)
+                    return;
+
+                lastPayload = payload;
+                render(data);
+            } catch (error) {
+                content.textContent = 'Could not load schedule.json: ' + error.message;
+            }
+        }
+
+        function render(data) {
+            content.replaceChildren();
+
+            if (!data.parallelTime) {
+                const empty = document.createElement('p');
+                empty.textContent = 'No operations to display.';
+                content.append(empty);
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.setAttribute('border', '1');
+            table.setAttribute('cellpadding', '6');
+            table.setAttribute('cellspacing', '0');
+
+            const head = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            const blockHead = document.createElement('th');
+            blockHead.textContent = 'Block';
+            headRow.append(blockHead);
+
+            for (let tick = 1; tick <= data.parallelTime; tick++) {
+                const cell = document.createElement('th');
+                cell.textContent = tick;
+                headRow.append(cell);
+            }
+
+            head.append(headRow);
+            table.append(head);
+
+            const body = document.createElement('tbody');
+
+            for (const block of data.blocks) {
+                const row = document.createElement('tr');
+                const blockCell = document.createElement('th');
+                blockCell.textContent = block.id;
+                row.append(blockCell);
+
+                let tick = 0;
+
+                while (tick < data.parallelTime) {
+                    const entry = data.entries.find(item => item.block === block.id && item.start === tick);
+                    const cell = document.createElement('td');
+
+                    if (entry) {
+                        cell.colSpan = entry.duration;
+                        cell.textContent = entry.operation;
+                        tick += entry.duration;
+                    } else {
+                        cell.textContent = '';
+                        tick++;
+                    }
+
+                    row.append(cell);
+                }
+
+                body.append(row);
+            }
+
+            table.append(body);
+            content.append(table);
+
+            const metricsTitle = document.createElement('h2');
+            metricsTitle.textContent = 'Metrics';
+            content.append(metricsTitle);
+
+            const metrics = document.createElement('ul');
+            const sequential = document.createElement('li');
+            sequential.textContent = 'Sequential time: ' + data.sequentialTime;
+            const parallel = document.createElement('li');
+            parallel.textContent = 'Parallel time: ' + data.parallelTime;
+            const speedup = document.createElement('li');
+            speedup.textContent = 'Speedup: ' + data.sequentialTime + ' / ' + data.parallelTime
+                    + ' = ' + data.speedup.toFixed(2);
+            const efficiency = document.createElement('li');
+            efficiency.textContent = 'Efficiency: ' + data.speedup.toFixed(2) + ' / ' + data.blockCount
+                    + ' = ' + data.efficiency.toFixed(2) + ' (' + (data.efficiency * 100).toFixed(2) + '%)';
+
+            metrics.append(sequential, parallel, speedup, efficiency);
+            content.append(metrics);
+        }
+
+        loadSchedule();
+        setInterval(loadSchedule, 1000);
+    </script>
+</body>
+</html>

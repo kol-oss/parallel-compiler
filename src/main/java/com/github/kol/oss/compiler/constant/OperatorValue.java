@@ -20,6 +20,16 @@ public enum OperatorValue {
         return symbol;
     }
 
+    public String toCode() {
+        return switch (this) {
+            case PLUS -> "P";
+            case MINUS -> "S";
+            case MULTIPLY -> "M";
+            case DIVISION -> "D";
+            default -> symbol;
+        };
+    }
+
     public static OperatorValue fromSymbol(String symbol) {
         return switch (symbol) {
             case OperatorSymbol.PLUS -> PLUS;

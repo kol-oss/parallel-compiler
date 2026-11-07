@@ -177,7 +177,7 @@ public class ConsoleView {
 
             for (BlockEfficiency block : metrics.blockEfficiencies()) {
                 System.out.printf(Locale.US, "[%s] (%d / %d) / %d = %.2f (%.2f%%)%n",
-                        operatorCode(block.operator()),
+                        block.operator().toCode(),
                         block.busyTime(),
                         block.parallelTime(),
                         block.blockCount(),
@@ -224,16 +224,6 @@ public class ConsoleView {
     }
 
     private String blockLabel(int block, OperatorValue operator) {
-        return operatorCode(operator) + "-" + (block + 1);
-    }
-
-    private String operatorCode(OperatorValue operator) {
-        return switch (operator) {
-            case PLUS -> "P";
-            case MINUS -> "S";
-            case MULTIPLY -> "M";
-            case DIVISION -> "D";
-            default -> operator.toSymbol();
-        };
+        return operator.toCode() + "-" + (block + 1);
     }
 }

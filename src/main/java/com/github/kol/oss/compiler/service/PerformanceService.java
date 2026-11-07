@@ -9,20 +9,13 @@ import com.github.kol.oss.compiler.dto.schedule.ExecutionSchedule;
 import java.util.List;
 
 public class PerformanceService {
-    private static final List<OperatorValue> OPERATORS = List.of(
-            OperatorValue.PLUS,
-            OperatorValue.MINUS,
-            OperatorValue.MULTIPLY,
-            OperatorValue.DIVISION
-    );
-
     public PerformanceMetrics evaluate(ExecutionSchedule schedule) {
         int sequentialTime = schedule.sequentialTime();
         int parallelTime = schedule.parallelTime();
 
         double speedup = parallelTime == 0 ? 0.0 : (double) sequentialTime / parallelTime;
         double efficiency = schedule.blockCount() == 0 ? 0.0 : speedup / schedule.blockCount();
-        List<BlockEfficiency> blockEfficiencies = OPERATORS.stream()
+        List<BlockEfficiency> blockEfficiencies = VectorSystemConfig.OPERATORS.stream()
                 .map(operator -> evaluateBlock(schedule, operator))
                 .toList();
 
