@@ -134,15 +134,16 @@
             const processedLabel = document.createElement('span');
             processedLabel.textContent = 'Processed Expression: ';
             const processedValue = document.createElement('strong');
-            processedValue.textContent = data.processedExpression || '';
+            processedValue.textContent = data.processedExpression || '(not available)';
             processed.append(processedLabel, processedValue);
             content.append(processed);
 
             const durations = document.createElement('p');
             durations.className = 'durations';
-            durations.textContent = 'Operation durations: ' + (data.durations || [])
+            const durationText = (data.durations || [])
                     .map(item => item.symbol + ' = ' + item.duration)
                     .join(', ');
+            durations.textContent = 'Operation durations: ' + (durationText || '(not available)');
             content.append(durations);
 
             if (!data.parallelTime) {
