@@ -10,6 +10,7 @@ import com.github.kol.oss.compiler.pipeline.TransformationResult;
 import com.github.kol.oss.compiler.pipeline.TransformationService;
 import com.github.kol.oss.compiler.service.*;
 import com.github.kol.oss.compiler.view.ConsoleView;
+import com.github.kol.oss.compiler.view.ExpressionFormatter;
 import com.github.kol.oss.compiler.view.ScheduleJsonExporter;
 
 import java.util.*;
@@ -114,7 +115,12 @@ public class Main {
                             view.printVectorSystemConfiguration();
                             view.printExecutionTimeline(schedule);
                             view.printPerformanceMetrics(metrics);
-                            scheduleJsonExporter.export(schedule, metrics);
+                            scheduleJsonExporter.export(
+                                    value.trim(),
+                                    ExpressionFormatter.format(normalized),
+                                    schedule,
+                                    metrics
+                            );
                         }
                     }
                 }

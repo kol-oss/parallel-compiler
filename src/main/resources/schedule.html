@@ -3,6 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <title>Block Occupancy</title>
+    <style>
+        body {
+            margin: 2rem;
+            color: #1f2937;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+
+        h1,
+        h2 {
+            margin: 0 0 1rem;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        h2 {
+            margin-top: 2rem;
+        }
+
+        .expression,
+        .processed-expression,
+        .durations {
+            margin: 0 0 0.5rem;
+        }
+
+        table {
+            margin-top: 1rem;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 0.45rem 0.7rem;
+            border: 1px solid #d1d5db;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        thead th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+
+        tbody th {
+            background: #f9fafb;
+            text-align: left;
+        }
+
+        .block-P {
+            color: #2563eb;
+        }
+
+        .block-S {
+            color: #16a34a;
+        }
+
+        .block-M {
+            color: #ea580c;
+        }
+
+        .block-D {
+            color: #9333ea;
+        }
+
+        .cell-P {
+            background: rgba(37, 99, 235, 0.14);
+        }
+
+        .cell-S {
+            background: rgba(22, 163, 74, 0.14);
+        }
+
+        .cell-M {
+            background: rgba(234, 88, 12, 0.14);
+        }
+
+        .cell-D {
+            background: rgba(147, 51, 234, 0.14);
+        }
+
+        .metrics {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .metrics li {
+            margin: 0.25rem 0;
+        }
+    </style>
 </head>
 <body>
     <h1>Block Occupancy</h1>
@@ -35,6 +124,27 @@
         function render(data) {
             content.replaceChildren();
 
+            const expression = document.createElement('p');
+            expression.className = 'expression';
+            expression.textContent = 'Expression: ' + (data.expression || '');
+            content.append(expression);
+
+            const processed = document.createElement('p');
+            processed.className = 'processed-expression';
+            const processedLabel = document.createElement('span');
+            processedLabel.textContent = 'Processed Expression: ';
+            const processedValue = document.createElement('strong');
+            processedValue.textContent = data.processedExpression || '';
+            processed.append(processedLabel, processedValue);
+            content.append(processed);
+
+            const durations = document.createElement('p');
+            durations.className = 'durations';
+            durations.textContent = 'Operation durations: ' + (data.durations || [])
+                    .map(item => item.symbol + ' = ' + item.duration)
+                    .join(', ');
+            content.append(durations);
+
             if (!data.parallelTime) {
                 const empty = document.createElement('p');
                 empty.textContent = 'No operations to display.';
@@ -43,10 +153,6 @@
             }
 
             const table = document.createElement('table');
-            table.setAttribute('border', '1');
-            table.setAttribute('cellpadding', '6');
-            table.setAttribute('cellspacing', '0');
-
             const head = document.createElement('thead');
             const headRow = document.createElement('tr');
             const blockHead = document.createElement('th');
@@ -67,6 +173,7 @@
             for (const block of data.blocks) {
                 const row = document.createElement('tr');
                 const blockCell = document.createElement('th');
+                blockCell.className = 'block-' + block.operator;
                 blockCell.textContent = block.id;
                 row.append(blockCell);
 
@@ -77,6 +184,7 @@
                     const cell = document.createElement('td');
 
                     if (entry) {
+                        cell.className = 'cell-' + block.operator;
                         cell.colSpan = entry.duration;
                         cell.textContent = entry.operation;
                         tick += entry.duration;
@@ -99,6 +207,7 @@
             content.append(metricsTitle);
 
             const metrics = document.createElement('ul');
+            metrics.className = 'metrics';
             const sequential = document.createElement('li');
             sequential.textContent = 'Sequential time: ' + data.sequentialTime;
             const parallel = document.createElement('li');

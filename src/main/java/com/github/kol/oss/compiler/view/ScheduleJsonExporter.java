@@ -17,17 +17,34 @@ import java.util.List;
 public class ScheduleJsonExporter {
     private static final Path OUTPUT = Path.of("src", "main", "resources", "schedule.json");
 
-    public void export(ExecutionSchedule schedule, PerformanceMetrics metrics) {
+    public void export(
+            String expression,
+            String processedExpression,
+            ExecutionSchedule schedule,
+            PerformanceMetrics metrics
+    ) {
         try {
             Files.createDirectories(OUTPUT.getParent());
-            Files.writeString(OUTPUT, toJson(schedule, metrics), StandardCharsets.UTF_8);
+            Files.writeString(
+                    OUTPUT,
+                    toJson(expression, processedExpression, schedule, metrics),
+                    StandardCharsets.UTF_8
+            );
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
     }
 
-    private String toJson(ExecutionSchedule schedule, PerformanceMetrics metrics) {
+    private String toJson(
+            String expression,
+            String processedExpression,
+            ExecutionSchedule schedule,
+            PerformanceMetrics metrics
+    ) {
         return "{\n" +
+                "  \"expression\": \"" + escape(expression) + "\",\n" +
+                "  \"processedExpression\": \"" + escape(processedExpression) + "\",\n" +
+                "  \"durations\": [\n" + durations() + "\n  ],\n" +
                 "  \"sequentialTime\": " + metrics.sequentialTime() + ",\n" +
                 "  \"parallelTime\": " + metrics.parallelTime() + ",\n" +
                 "  \"speedup\": " + metrics.speedup() + ",\n" +
@@ -36,6 +53,17 @@ public class ScheduleJsonExporter {
                 "  \"blocks\": [\n" + blocks() + "\n  ],\n" +
                 "  \"entries\": [\n" + entries(schedule) + "\n  ]\n" +
                 "}\n";
+    }
+
+    private String durations() {
+        List<String> durations = new ArrayList<>();
+
+        for (OperatorValue operator : VectorSystemConfig.OPERATORS)
+            durations.add("    { \"operator\": \"" + operator.toCode()
+                    + "\", \"symbol\": \"" + escape(operator.toSymbol())
+                    + "\", \"duration\": " + VectorSystemConfig.duration(operator) + " }");
+
+        return String.join(",\n", durations);
     }
 
     private String blocks() {

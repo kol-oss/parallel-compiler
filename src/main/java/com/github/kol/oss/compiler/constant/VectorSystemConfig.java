@@ -31,4 +31,14 @@ public class VectorSystemConfig {
             default -> 0;
         };
     }
+
+    public static int duration(OperatorValue operator) {
+        return switch (operator) {
+            case PLUS -> ADDITION_DURATION;
+            case MINUS -> SUBTRACTION_DURATION;
+            case MULTIPLY -> MULTIPLICATION_DURATION;
+            case DIVISION -> DIVISION_DURATION;
+            default -> 0;
+        };
+    }
 }
