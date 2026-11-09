@@ -16,6 +16,8 @@ public class VectorSystemService {
         List<TokenNode> operations = TreeWalker.postOrder(root).stream()
                 .filter(OperationNode.class::isInstance)
                 .toList();
+
+        // calculate total time if all operations were executed sequentially
         int sequentialTime = operations.stream()
                 .mapToInt(this::duration)
                 .sum();
@@ -23,6 +25,7 @@ public class VectorSystemService {
         if (operations.isEmpty())
             return new ExecutionSchedule(List.of(), sequentialTime, 0, VectorSystemConfig.TOTAL_BLOCKS);
 
+        // compute bottom levels for critical path prioritization
         Map<TokenNode, Integer> bottomLevels = bottomLevels(root);
         Map<TokenNode, List<TokenNode>> dependencies = new IdentityHashMap<>();
         Map<TokenNode, List<TokenNode>> dependents = new IdentityHashMap<>();
@@ -37,6 +40,7 @@ public class VectorSystemService {
             for (TokenNode dependency : nodeDependencies)
                 dependents.computeIfAbsent(dependency, _ -> new ArrayList<>()).add(node);
 
+            // if an operation has no dependencies, it's ready to execute right now
             if (nodeDependencies.isEmpty())
                 ready.add(node);
         }
@@ -53,25 +57,31 @@ public class VectorSystemService {
             while (!ready.isEmpty()) {
                 TokenNode node = ready.poll();
 
+                // check if the operation can start at the current time
                 if (earliestStart(node, dependencies, completion, units) > currentTime) {
                     deferred.add(node);
                     continue;
                 }
 
+                // allocate the best available block for this operator
                 OperatorValue operator = operator(node);
                 int[] availability = units.get(operator);
                 int block = earliestBlock(availability);
                 int finish = currentTime + duration(node);
 
+                // update unit availability and operation completion time
                 availability[block] = finish;
                 completion.put(node, finish);
                 entries.add(new ScheduleEntry(node, block, currentTime, finish));
+
+                // release dependent nodes and add them to ready queue if unblocked
                 releaseDependents(node, dependents, pending, ready);
                 scheduled = true;
             }
 
             ready.addAll(deferred);
 
+            // if no operations could be scheduled in this cycle, forward time to the next available slot
             if (!scheduled)
                 currentTime = nextTime(ready, dependencies, completion, units, currentTime);
         }
